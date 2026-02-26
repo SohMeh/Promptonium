@@ -14,7 +14,7 @@ export function GeneratePanel({ streamingContent, isLoading }: GeneratePanelProp
       <div>
         <h2 className="text-xl font-semibold mb-1">Generating Your Prompt</h2>
         <p className="text-sm text-muted-foreground">
-          Claude is crafting an optimized prompt based on your requirements.
+          Crafting an optimized prompt based on your requirements.
         </p>
       </div>
 

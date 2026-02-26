@@ -13,6 +13,14 @@ export interface DimensionResult {
   weight: number;
   explanation: string;
   suggestions: string[];
+  tips: PromptEngineeringTip[];
+}
+
+export interface PromptEngineeringTip {
+  title: string;
+  description: string;
+  /** Topic ID for future cross-reference with Academy exercises and Arena challenges */
+  topicId?: string;
 }
 
 export type RubricDimension =

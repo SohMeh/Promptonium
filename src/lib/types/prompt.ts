@@ -53,6 +53,8 @@ export interface BuilderIntake {
   tone: ToneType;
   constraints: string;
   modelTarget: ModelTarget;
+  /** When true, use free open models (via HuggingFace) for generation instead of Anthropic API */
+  useOpenModel?: boolean;
 }
 
 export interface ClarifyingQuestion {

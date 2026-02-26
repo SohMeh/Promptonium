@@ -11,7 +11,10 @@ export async function POST(request: Request) {
       refinedIntent: Record<string, unknown>;
     };
 
-    const provider = getProviderRegistry().getDefault();
+    const registry = getProviderRegistry();
+    const provider = intake.useOpenModel
+      ? registry.get("free") || registry.getDefault()
+      : registry.getDefault();
     const { system, user } = buildClarifyPrompt(intake, refinedIntent, answers);
 
     const result = await provider.generate(user, {

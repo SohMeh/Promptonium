@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { BuilderIntake, TaskType, ToneType, ModelTarget } from "@/lib/types/prompt";
-import { Loader2 } from "lucide-react";
+import { Loader2, Zap, Globe } from "lucide-react";
 
 const TASK_TYPES: { value: TaskType; label: string }[] = [
   { value: "email", label: "Email / Message" },
@@ -46,6 +46,7 @@ export function IntakeForm({ onSubmit, isLoading }: IntakeFormProps) {
     tone: "professional",
     constraints: "",
     modelTarget: "claude",
+    useOpenModel: false,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -87,6 +88,7 @@ export function IntakeForm({ onSubmit, isLoading }: IntakeFormProps) {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Target Model</label>
+              <p className="text-xs text-muted-foreground">Which AI will use this prompt?</p>
               <Select value={form.modelTarget} onValueChange={(v) => setForm({ ...form, modelTarget: v as ModelTarget })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -127,6 +129,46 @@ export function IntakeForm({ onSubmit, isLoading }: IntakeFormProps) {
               onChange={(e) => setForm({ ...form, constraints: e.target.value })}
               rows={2}
             />
+          </div>
+
+          {/* Generation provider toggle */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Generation Engine</label>
+            <p className="text-xs text-muted-foreground">
+              Choose what powers the prompt builder. This is separate from the target model above.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, useOpenModel: false })}
+                className={`flex items-center gap-2 rounded-lg border p-3 text-left text-sm transition-colors ${
+                  !form.useOpenModel
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border hover:bg-accent"
+                }`}
+              >
+                <Zap className="h-4 w-4 shrink-0" />
+                <div>
+                  <div className="font-medium">Claude (API Key)</div>
+                  <div className="text-xs text-muted-foreground">Higher quality, requires API key</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, useOpenModel: true })}
+                className={`flex items-center gap-2 rounded-lg border p-3 text-left text-sm transition-colors ${
+                  form.useOpenModel
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border hover:bg-accent"
+                }`}
+              >
+                <Globe className="h-4 w-4 shrink-0" />
+                <div>
+                  <div className="font-medium">Free Open Models</div>
+                  <div className="text-xs text-muted-foreground">No API key needed, free open-source model</div>
+                </div>
+              </button>
+            </div>
           </div>
 
           <Button type="submit" disabled={isLoading || !form.objective.trim()} className="w-full">

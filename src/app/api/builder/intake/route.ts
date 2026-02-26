@@ -11,25 +11,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Objective is required" }, { status: 400 });
     }
 
-    const provider = getProviderRegistry().getDefault();
+    const registry = getProviderRegistry();
+    const provider = intake.useOpenModel
+      ? registry.get("free") || registry.getDefault()
+      : registry.getDefault();
+
     const { system, user } = buildIntakeAnalysisPrompt(intake);
 
-    const result = await provider.generate(user, {
-      systemPrompt: system,
-      temperature: 0.3,
-      maxTokens: 2048,
-    });
+    // Retry up to 2 times for free model (can be flaky)
+    const maxAttempts = intake.useOpenModel ? 3 : 1;
+    let lastError: Error | null = null;
 
-    const parsed = JSON.parse(cleanJsonResponse(result.content));
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await provider.generate(user, {
+          systemPrompt: system,
+          temperature: 0.3,
+          maxTokens: 2048,
+        });
 
-    return NextResponse.json({
-      clarifyingQuestions: parsed.clarifyingQuestions || [],
-      refinedIntent: parsed.refinedIntent || {},
-    });
+        const parsed = JSON.parse(cleanJsonResponse(result.content));
+
+        return NextResponse.json({
+          clarifyingQuestions: parsed.clarifyingQuestions || [],
+          refinedIntent: parsed.refinedIntent || {},
+        });
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.error(`Builder intake attempt ${attempt}/${maxAttempts} failed:`, lastError.message);
+        if (attempt < maxAttempts) {
+          // Wait a bit before retrying
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+    }
+
+    // All attempts failed — return detailed error to help debug
+    return NextResponse.json(
+      { error: `Intake analysis failed: ${lastError?.message || "Unknown error"}` },
+      { status: 500 }
+    );
   } catch (error) {
     console.error("Builder intake error:", error);
     return NextResponse.json(
-      { error: "Failed to analyze intake" },
+      { error: `Failed to analyze intake: ${(error as Error).message}` },
       { status: 500 }
     );
   }

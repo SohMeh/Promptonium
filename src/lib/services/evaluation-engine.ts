@@ -3,9 +3,18 @@ import type { EvaluationRun, DimensionResult, RubricDimension, RubricConfig } fr
 import { DEFAULT_RUBRIC_WEIGHTS } from "@/lib/types/evaluation";
 import { getProviderRegistry } from "@/lib/providers";
 import { buildEvaluationPrompt } from "@/lib/builder/prompt-templates";
+import { PE_TIPS } from "@/lib/data/pe-tips";
 
 function generateId(): string {
   return `eval_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Get tips relevant to a dimension based on score */
+function getTipsForDimension(dimension: RubricDimension, score: number) {
+  const tips = PE_TIPS[dimension] || [];
+  if (score >= 85) return []; // Strong — no tips needed
+  if (score >= 70) return tips.slice(0, 1); // Solid — one tip
+  return tips.slice(0, 2); // Developing or below — two tips
 }
 
 function checkInstructionCompliance(prompt: PromptContent, intake: BuilderIntake): DimensionResult {
@@ -53,9 +62,10 @@ function checkInstructionCompliance(prompt: PromptContent, intake: BuilderIntake
     score,
     weight: DEFAULT_RUBRIC_WEIGHTS.instruction_compliance,
     explanation: missing.length > 0
-      ? `Prompt addresses ${matched.length}/${requirements.length} requirements. Missing: ${missing.join(", ")}.`
-      : `Prompt addresses all ${requirements.length} identified requirements.`,
-    suggestions: missing.map((m) => `Include ${m} in the prompt`),
+      ? `Your prompt covers ${matched.length} of ${requirements.length} key requirements — nice work! To strengthen it further, consider adding: ${missing.join(", ")}.`
+      : `Great job! Your prompt addresses all ${requirements.length} identified requirements.`,
+    suggestions: missing.map((m) => `Try adding ${m} to make your prompt more complete`),
+    tips: getTipsForDimension("instruction_compliance", score),
   };
 }
 
@@ -69,10 +79,10 @@ function checkEfficiency(prompt: PromptContent): DimensionResult {
 
   if (estimatedTokens > 2000) {
     score -= 20;
-    suggestions.push("Prompt is very long. Consider trimming redundant instructions.");
+    suggestions.push("Your prompt is on the longer side. See if any instructions repeat or could be combined.");
   } else if (estimatedTokens > 1000) {
     score -= 10;
-    suggestions.push("Prompt is moderately long. Look for opportunities to be more concise.");
+    suggestions.push("Moderate length — you might find opportunities to tighten a few sections.");
   }
 
   const sentences = raw.split(/[.!?]+/).map((s) => s.trim().toLowerCase()).filter((s) => s.length > 20);
@@ -84,13 +94,13 @@ function checkEfficiency(prompt: PromptContent): DimensionResult {
   }
   if (duplicates > 0) {
     score -= duplicates * 10;
-    suggestions.push(`Found ${duplicates} repeated sentence(s). Remove duplicates.`);
+    suggestions.push(`Spotted ${duplicates} repeated sentence(s) — removing these will make your prompt cleaner.`);
   }
 
   const whitespace = (raw.match(/\n{3,}/g) || []).length;
   if (whitespace > 2) {
     score -= 5;
-    suggestions.push("Reduce excessive blank lines.");
+    suggestions.push("A few extra blank lines can be trimmed for a cleaner layout.");
   }
 
   score = Math.max(0, Math.min(100, score));
@@ -99,8 +109,9 @@ function checkEfficiency(prompt: PromptContent): DimensionResult {
     dimension: "efficiency",
     score,
     weight: DEFAULT_RUBRIC_WEIGHTS.efficiency,
-    explanation: `Estimated ${estimatedTokens} tokens. ${suggestions.length === 0 ? "Good token economy." : "Some efficiency improvements possible."}`,
+    explanation: `~${estimatedTokens} tokens. ${suggestions.length === 0 ? "Nice and concise!" : "A few opportunities to tighten things up."}`,
     suggestions,
+    tips: getTipsForDimension("efficiency", score),
   };
 }
 
@@ -125,13 +136,17 @@ async function runLLMJudge(
   const parsed = JSON.parse(cleaned.trim());
 
   const dimensions: RubricDimension[] = ["semantic_alignment", "style_tone_fit", "robustness", "llm_judge"];
-  return dimensions.map((dim) => ({
-    dimension: dim,
-    score: parsed[dim]?.score ?? 70,
-    weight: DEFAULT_RUBRIC_WEIGHTS[dim],
-    explanation: parsed[dim]?.explanation ?? "No explanation provided.",
-    suggestions: parsed[dim]?.suggestions ?? [],
-  }));
+  return dimensions.map((dim) => {
+    const score = parsed[dim]?.score ?? 75;
+    return {
+      dimension: dim,
+      score,
+      weight: DEFAULT_RUBRIC_WEIGHTS[dim],
+      explanation: parsed[dim]?.explanation ?? "No explanation provided.",
+      suggestions: parsed[dim]?.suggestions ?? [],
+      tips: getTipsForDimension(dim, score),
+    };
+  });
 }
 
 export async function evaluatePrompt(
@@ -158,11 +173,14 @@ export async function evaluatePrompt(
   );
 
   const sorted = [...allDimensions].sort((a, b) => a.score - b.score);
-  const guidance = sorted
+  const topSuggestions = sorted
     .slice(0, 2)
     .flatMap((d) => d.suggestions)
-    .slice(0, 4)
-    .join(" ");
+    .slice(0, 3);
+
+  const guidance = topSuggestions.length > 0
+    ? `Focus areas: ${topSuggestions.join(" Also: ")}`
+    : "Your prompt is looking strong! Try small tweaks in the Improve tab and re-evaluate to push your score even higher.";
 
   return {
     id: generateId(),
@@ -170,6 +188,6 @@ export async function evaluatePrompt(
     timestamp: Date.now(),
     totalScore,
     dimensions: allDimensions,
-    guidance: guidance || "Your prompt looks good! Consider minor refinements to reach a higher score.",
+    guidance,
   };
 }

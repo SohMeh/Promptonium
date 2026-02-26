@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   PROJECTS: "promptonium:projects",
   ATTEMPTS: "promptonium:attempts",
   PROGRESS: "promptonium:progress",
+  BUILDER_STATE: "promptonium:builder-state",
 } as const;
 
 function getItem<T>(key: string, fallback: T): T {
@@ -90,4 +91,18 @@ export function saveProgress(record: ProgressRecord): void {
 
 export function getProgressByPath(pathId: string): ProgressRecord[] {
   return getProgress().filter((r) => r.pathId === pathId);
+}
+
+// --- Builder State Persistence ---
+export function getBuilderState<T>(): T | null {
+  return getItem<T | null>(STORAGE_KEYS.BUILDER_STATE, null);
+}
+
+export function saveBuilderState(state: unknown): void {
+  setItem(STORAGE_KEYS.BUILDER_STATE, state);
+}
+
+export function clearBuilderState(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEYS.BUILDER_STATE);
 }

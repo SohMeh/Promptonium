@@ -1,5 +1,35 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Authentication + Database Setup
+
+This app includes email/password authentication backed by Prisma + SQLite.
+
+1. Copy environment variables:
+
+```bash
+cp .env.example .env
+```
+
+2. Generate Prisma client and create local DB schema:
+
+```bash
+npm run db:generate
+npm run db:push
+```
+
+3. Run the app:
+
+```bash
+npm run dev
+```
+
+Auth endpoints:
+
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/session`
+
 ## Getting Started
 
 First, run the development server:

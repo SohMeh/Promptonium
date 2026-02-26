@@ -1,20 +1,50 @@
 "use client";
 
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useEffect, useRef, useState } from "react";
 import { BuilderSidebar } from "@/components/builder/builder-sidebar";
 import { IntakeForm } from "@/components/builder/intake-form";
 import { ClarifyPanel } from "@/components/builder/clarify-panel";
 import { GeneratePanel } from "@/components/builder/generate-panel";
 import { EvaluatePanel } from "@/components/builder/evaluate-panel";
 import { ImprovePanel } from "@/components/builder/improve-panel";
+import { AnalyzeExistingPanel } from "@/components/builder/analyze-existing-panel";
 import { builderReducer } from "@/lib/builder/actions";
-import { INITIAL_STATE, type BuilderStep } from "@/lib/builder/state";
+import { INITIAL_STATE, type BuilderStep, type BuilderState } from "@/lib/builder/state";
 import { parsePromptSections } from "@/lib/builder/prompt-templates";
 import type { BuilderIntake, PromptContent } from "@/lib/types/prompt";
-import { saveProject } from "@/lib/services/storage";
+import { saveProject, getBuilderState, saveBuilderState, clearBuilderState } from "@/lib/services/storage";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
+import { RotateCcw, CheckCircle2, ExternalLink } from "lucide-react";
+
+function loadPersistedState(): BuilderState {
+  const saved = getBuilderState<BuilderState>();
+  if (!saved) return INITIAL_STATE;
+  // Always reset transient fields
+  return { ...saved, isLoading: false, error: null, streamingContent: "" };
+}
 
 export default function BuilderPage() {
-  const [state, dispatch] = useReducer(builderReducer, INITIAL_STATE);
+  const [state, dispatch] = useReducer(builderReducer, INITIAL_STATE, loadPersistedState);
+  const [savedToVault, setSavedToVault] = useState(false);
+  const isFirstRender = useRef(true);
+
+  // Persist state to localStorage on every change (skip first render)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    // Don't persist streaming content (too noisy) or loading state
+    const toPersist = { ...state, isLoading: false, streamingContent: "", error: null };
+    saveBuilderState(toPersist);
+  }, [state]);
+
+  const handleStartNew = useCallback(() => {
+    clearBuilderState();
+    dispatch({ type: "RESET" });
+  }, []);
 
   const handleEvaluate = useCallback(
     async (prompt: PromptContent, intake: BuilderIntake) => {
@@ -46,7 +76,10 @@ export default function BuilderPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ intake, refinedIntent }),
         });
-        if (!res.ok) throw new Error("Generation failed");
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => null);
+          throw new Error(errBody?.error || "Generation failed");
+        }
 
         const reader = res.body?.getReader();
         if (!reader) throw new Error("No stream");
@@ -95,7 +128,10 @@ export default function BuilderPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(intake),
         });
-        if (!res.ok) throw new Error("Intake analysis failed");
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => null);
+          throw new Error(errBody?.error || "Intake analysis failed");
+        }
         const data = await res.json();
         dispatch({
           type: "INTAKE_SUBMITTED",
@@ -128,7 +164,10 @@ export default function BuilderPage() {
           refinedIntent: state.refinedIntent,
         }),
       });
-      if (!res.ok) throw new Error("Clarification failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || "Clarification failed");
+      }
       const data = await res.json();
       dispatch({ type: "CLARIFY_COMPLETED", refinedIntent: data.refinedIntent });
       handleGenerate(state.intake, data.refinedIntent);
@@ -177,67 +216,153 @@ export default function BuilderPage() {
       modelTarget: state.intake.modelTarget,
       sourceMode: "builder",
     });
-    alert("Saved to vault!");
+    setSavedToVault(true);
   }, [state.generatedPrompt, state.intake, state.evaluation]);
 
   const handleStepClick = useCallback((step: BuilderStep) => {
     dispatch({ type: "SET_STEP", step });
   }, []);
 
+  const hasProgress = state.currentStep !== "intake" || state.intake !== null;
+
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col lg:flex-row min-h-[calc(100vh-3.5rem)]">
       <BuilderSidebar
         currentStep={state.currentStep}
         isLoading={state.isLoading}
         onStepClick={handleStepClick}
       />
 
-      <div className="flex-1 p-6 lg:p-8 max-w-3xl">
-        {state.error && (
-          <div className="mb-4 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-            {state.error}
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-4xl w-full relative z-10">
+        <div className="mb-8 pt-2">
+          <h1 className="text-3xl md:text-4xl font-extrabold mb-2 bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+            Prompt Studio
+          </h1>
+          <p className="text-muted-foreground font-light">Craft, refine, and perfect your AI prompts with intelligent orchestration.</p>
+        </div>
+
+        {hasProgress && (
+          <div className="flex justify-end mb-6">
+            <Button variant="outline" size="sm" onClick={handleStartNew} className="glass-card border-violet-500/20 hover:bg-violet-500/10 hover:border-violet-500/50 hover:text-violet-100 transition-all shadow-[0_0_15px_-5px_rgba(139,92,246,0.2)]">
+              <RotateCcw className="mr-2 h-4 w-4 text-violet-400" />
+              Start New Prompt
+            </Button>
           </div>
         )}
 
-        {state.currentStep === "intake" && (
-          <IntakeForm onSubmit={handleIntakeSubmit} isLoading={state.isLoading} />
+        {state.error && (
+          <div className="mb-6 rounded-xl glass-card border border-destructive/30 bg-destructive/5 p-5 shadow-[0_0_20px_-5px_rgba(239,68,68,0.2)] animate-in fade-in duration-300">
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <p className="font-semibold text-destructive mb-3">{state.error}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => {
+                    dispatch({ type: "SET_ERROR", error: null });
+                    // Retry from the current step
+                    if (state.currentStep === "intake" || state.currentStep === "clarify") {
+                      dispatch({ type: "SET_STEP", step: state.intake ? "clarify" : "intake" });
+                    } else if (state.currentStep === "generate" && state.intake && state.refinedIntent) {
+                      handleGenerate(state.intake, state.refinedIntent);
+                    } else if (state.currentStep === "evaluate" && state.generatedPrompt && state.intake) {
+                      handleEvaluate(state.generatedPrompt, state.intake);
+                    }
+                  }}
+                >
+                  <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
-        {state.currentStep === "clarify" && (
-          <ClarifyPanel
-            questions={state.clarifyingQuestions}
-            answers={state.answers}
-            onAnswer={(id, answer) =>
-              dispatch({ type: "ANSWER_QUESTION", questionId: id, answer })
-            }
-            onSubmit={handleClarifySubmit}
-            isLoading={state.isLoading}
-          />
+        {savedToVault && (
+          <div className="mb-6 rounded-xl glass-card border border-emerald-500/30 bg-emerald-500/5 p-5 shadow-[0_0_20px_-5px_rgba(16,185,129,0.2)] animate-in fade-in duration-300">
+            <div className="flex items-center gap-3 text-emerald-400 mb-3">
+              <div className="p-1 rounded-full bg-emerald-500/20">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+              </div>
+              <span className="font-bold text-lg">Saved to Vault!</span>
+            </div>
+            <div className="flex items-center gap-3 pl-11">
+              <Button asChild className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-50 border border-emerald-500/50 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]">
+                <Link href="/vault">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View in Vault
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSavedToVault(false)} className="text-muted-foreground hover:text-white">
+                Dismiss
+              </Button>
+            </div>
+          </div>
         )}
 
-        {state.currentStep === "generate" && (
-          <GeneratePanel
-            streamingContent={state.streamingContent}
-            isLoading={state.isLoading}
-          />
-        )}
+        <div className="glass-card rounded-2xl p-6 relative">
+          {state.currentStep === "intake" && (
+            <Tabs defaultValue="build" className="space-y-6 animate-in fade-in duration-500">
+              <TabsList className="grid w-full grid-cols-2 max-w-md bg-background/50 border border-white/5 h-12 p-1">
+                <TabsTrigger value="build" className="rounded-lg data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-100 data-[state=active]:shadow-[0_0_15px_-3px_rgba(139,92,246,0.3)] transition-all">Build New Prompt</TabsTrigger>
+                <TabsTrigger value="analyze" className="rounded-lg data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-100 data-[state=active]:shadow-[0_0_15px_-3px_rgba(139,92,246,0.3)] transition-all">Analyze Existing Prompt</TabsTrigger>
+              </TabsList>
 
-        {state.currentStep === "evaluate" && state.evaluation && (
-          <EvaluatePanel evaluation={state.evaluation} />
-        )}
+              <TabsContent value="build" className="mt-0 outline-none">
+                <IntakeForm onSubmit={handleIntakeSubmit} isLoading={state.isLoading} />
+              </TabsContent>
 
-        {state.currentStep === "improve" && state.generatedPrompt && (
-          <ImprovePanel
-            prompt={state.generatedPrompt}
-            evaluation={state.evaluation}
-            isLoading={state.isLoading}
-            onUpdateSection={(section, value) =>
-              dispatch({ type: "UPDATE_PROMPT_SECTION", section, value })
-            }
-            onReEvaluate={handleReEvaluate}
-            onSave={handleSave}
-          />
-        )}
+              <TabsContent value="analyze" className="mt-0 outline-none">
+                <AnalyzeExistingPanel />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {state.currentStep === "clarify" && (
+            <div className="animate-in slide-in-from-right-4 fade-in duration-500">
+              <ClarifyPanel
+                questions={state.clarifyingQuestions}
+                answers={state.answers}
+                onAnswer={(id, answer) =>
+                  dispatch({ type: "ANSWER_QUESTION", questionId: id, answer })
+                }
+                onSubmit={handleClarifySubmit}
+                isLoading={state.isLoading}
+              />
+            </div>
+          )}
+
+          {state.currentStep === "generate" && (
+            <div className="animate-in slide-in-from-right-4 fade-in duration-500">
+              <GeneratePanel
+                streamingContent={state.streamingContent}
+                isLoading={state.isLoading}
+              />
+            </div>
+          )}
+
+          {state.currentStep === "evaluate" && state.evaluation && (
+            <div className="animate-in slide-in-from-right-4 fade-in duration-500">
+              <EvaluatePanel evaluation={state.evaluation} />
+            </div>
+          )}
+
+          {state.currentStep === "improve" && state.generatedPrompt && (
+            <div className="animate-in slide-in-from-right-4 fade-in duration-500">
+              <ImprovePanel
+                prompt={state.generatedPrompt}
+                evaluation={state.evaluation}
+                isLoading={state.isLoading}
+                onUpdateSection={(section, value) =>
+                  dispatch({ type: "UPDATE_PROMPT_SECTION", section, value })
+                }
+                onReEvaluate={handleReEvaluate}
+                onSave={handleSave}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
