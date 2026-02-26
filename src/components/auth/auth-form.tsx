@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Github } from "lucide-react";
 
 type Mode = "login" | "signup";
 
@@ -36,22 +37,37 @@ export function AuthForm({ mode }: AuthFormProps) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/auth/${mode}`, {
+      if (isSignup) {
+        const signupResponse = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+          }),
+        });
+
+        const signupData = await signupResponse.json();
+        if (!signupResponse.ok) {
+          setError(signupData.error || "Authentication failed");
+          return;
+        }
+      }
+
+      const loginResponse = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-        }),
+        body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Authentication failed");
+      if (!loginResponse.ok) {
+        const loginData = await loginResponse.json().catch(() => ({}));
+        setError(loginData.error || "Invalid email or password");
         return;
       }
 
@@ -129,6 +145,54 @@ export function AuthForm({ mode }: AuthFormProps) {
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Please wait..." : isSignup ? "Create account" : "Log in"}
             </Button>
+
+            {!isSignup ? (
+              <div className="text-right">
+                <Link className="text-sm font-medium text-primary hover:underline" href="/forgot-password">
+                  Forgot your password?
+                </Link>
+              </div>
+            ) : null}
+
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  window.location.href = `/api/auth/signin/google?callbackUrl=${encodeURIComponent(redirectPath)}`;
+                }}
+              >
+                Google
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  window.location.href = `/api/auth/signin/github?callbackUrl=${encodeURIComponent(redirectPath)}`;
+                }}
+              >
+                <Github className="mr-2 h-4 w-4" />
+                GitHub
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  window.location.href = `/api/auth/signin/facebook?callbackUrl=${encodeURIComponent(redirectPath)}`;
+                }}
+              >
+                Facebook
+              </Button>
+            </div>
           </form>
 
           <p className="mt-4 text-sm text-muted-foreground">

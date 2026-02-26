@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { getSessionFromCookies } from "@/lib/auth";
+import { auth } from "@/auth";
 
 export async function GET() {
-  const session = await getSessionFromCookies();
+  const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     return NextResponse.json({ user: null }, { status: 401 });
   }
 
   return NextResponse.json({
     user: {
-      id: session.userId,
-      email: session.email,
-      name: session.name,
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
     },
   });
 }

@@ -1,8 +1,6 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { setSessionCookie } from "@/lib/auth";
-import { createSessionToken } from "@/lib/session-token";
 
 export async function POST(request: Request) {
   try {
@@ -23,32 +21,37 @@ export async function POST(request: Request) {
     }
 
     const existingUser = await db.user.findUnique({ where: { email } });
-    if (existingUser) {
+    if (existingUser?.passwordHash) {
       return NextResponse.json({ error: "Email already in use" }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const user = await db.user.create({
-      data: {
-        name,
-        email,
-        passwordHash,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
-    });
-
-    const token = await createSessionToken({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-    });
-
-    await setSessionCookie(token);
+    const user = existingUser
+      ? await db.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name: existingUser.name ?? name,
+            passwordHash,
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        })
+      : await db.user.create({
+          data: {
+            name,
+            email,
+            passwordHash,
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        });
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
