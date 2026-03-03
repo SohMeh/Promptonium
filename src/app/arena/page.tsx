@@ -12,7 +12,7 @@ export default function ArenaPage() {
       <div className="mb-10 pt-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
           <div className="flex-1">
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(235,117,47,0.3)]">
               Prompt Arena
             </h1>
             <p className="text-lg text-muted-foreground font-light max-w-2xl">
@@ -21,9 +21,9 @@ export default function ArenaPage() {
               compares on the global leaderboard.
             </p>
           </div>
-          <Button variant="outline" asChild className="shrink-0 glass-card border-cyan-500/20 hover:bg-cyan-500/10 hover:border-cyan-500/50 shadow-[0_0_15px_-5px_rgba(6,182,212,0.3)]">
+          <Button variant="outline" asChild className="shrink-0 glass-card border-orange-500/20 hover:bg-orange-500/10 hover:border-orange-500/50 shadow-[0_0_15px_-5px_rgba(235,117,47,0.3)]">
             <Link href="/arena/leaderboard">
-              <BarChart3 className="h-4 w-4 mr-2 text-cyan-400" />
+              <BarChart3 className="h-4 w-4 mr-2 text-orange-400" />
               <span className="font-semibold">Leaderboard</span>
             </Link>
           </Button>
@@ -31,7 +31,7 @@ export default function ArenaPage() {
       </div>
 
       <div className="relative mb-12">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent mb-8" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-500/20 to-transparent mb-8" />
         <ChallengeBrowser />
       </div>
 

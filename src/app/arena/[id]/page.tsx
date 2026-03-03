@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Play, Send, Loader2, Clock } from "lucide-react";
+import { useModel } from "@/context/model-context";
 import { Timer } from "@/components/arena/timer";
 import { ChallengeResult } from "@/components/arena/challenge-result";
 import { getChallengeById } from "@/data/challenges";
@@ -46,6 +47,7 @@ export default function ChallengePage({
   const [personalBest, setPersonalBest] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const { useOpenModel } = useModel();
 
   const handleSubmit = useCallback(
     async (text?: string) => {
@@ -66,7 +68,7 @@ export default function ChallengePage({
       try {
         const response = await fetch("/api/arena/attempt", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
           body: JSON.stringify({
             challengeId: challenge.id,
             promptContent: content,
@@ -107,7 +109,7 @@ export default function ChallengePage({
         isSubmittingRef.current = false;
       }
     },
-    [challenge, promptText, startedAt]
+    [challenge, promptText, startedAt, useOpenModel]
   );
 
   const handleStart = useCallback(() => {
@@ -263,6 +265,11 @@ export default function ChallengePage({
                   </>
                 )}
               </Button>
+              {state === "submitting" && useOpenModel && (
+                <p className="text-xs text-muted-foreground text-center animate-pulse">
+                  Free model evaluating — may take up to 30s…
+                </p>
+              )}
             </>
           )}
         </div>

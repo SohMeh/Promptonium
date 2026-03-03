@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { RotateCcw, CheckCircle2, ExternalLink } from "lucide-react";
+import { useModel } from "@/context/model-context";
 
 function loadPersistedState(): BuilderState {
   const saved = getBuilderState<BuilderState>();
@@ -29,6 +30,7 @@ export default function BuilderPage() {
   const [state, dispatch] = useReducer(builderReducer, INITIAL_STATE, loadPersistedState);
   const [savedToVault, setSavedToVault] = useState(false);
   const isFirstRender = useRef(true);
+  const { useOpenModel } = useModel();
 
   // Persist state to localStorage on every change (skip first render)
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function BuilderPage() {
       try {
         const res = await fetch("/api/builder/evaluate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
           body: JSON.stringify({ promptContent: prompt, intake }),
         });
         if (!res.ok) throw new Error("Evaluation failed");
@@ -63,7 +65,7 @@ export default function BuilderPage() {
         dispatch({ type: "SET_ERROR", error: (err as Error).message });
       }
     },
-    []
+    [useOpenModel]
   );
 
   const handleGenerate = useCallback(
@@ -73,7 +75,7 @@ export default function BuilderPage() {
       try {
         const res = await fetch("/api/builder/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
           body: JSON.stringify({ intake, refinedIntent }),
         });
         if (!res.ok) {
@@ -116,7 +118,7 @@ export default function BuilderPage() {
         dispatch({ type: "SET_ERROR", error: (err as Error).message });
       }
     },
-    [handleEvaluate]
+    [handleEvaluate, useOpenModel]
   );
 
   const handleIntakeSubmit = useCallback(
@@ -125,7 +127,7 @@ export default function BuilderPage() {
       try {
         const res = await fetch("/api/builder/intake", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
           body: JSON.stringify(intake),
         });
         if (!res.ok) {
@@ -148,7 +150,7 @@ export default function BuilderPage() {
         dispatch({ type: "SET_ERROR", error: (err as Error).message });
       }
     },
-    [handleGenerate]
+    [handleGenerate, useOpenModel]
   );
 
   const handleClarifySubmit = useCallback(async () => {
@@ -157,7 +159,7 @@ export default function BuilderPage() {
     try {
       const res = await fetch("/api/builder/clarify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
         body: JSON.stringify({
           intake: state.intake,
           answers: state.answers,
@@ -174,7 +176,7 @@ export default function BuilderPage() {
     } catch (err) {
       dispatch({ type: "SET_ERROR", error: (err as Error).message });
     }
-  }, [state.intake, state.answers, state.refinedIntent, handleGenerate]);
+  }, [state.intake, state.answers, state.refinedIntent, handleGenerate, useOpenModel]);
 
   const handleReEvaluate = useCallback(async () => {
     if (!state.generatedPrompt || !state.intake) return;
@@ -235,7 +237,7 @@ export default function BuilderPage() {
 
       <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-4xl w-full relative z-10">
         <div className="mb-8 pt-2">
-          <h1 className="text-3xl md:text-4xl font-extrabold mb-2 bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+          <h1 className="text-3xl md:text-4xl font-extrabold mb-2 bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(235,117,47,0.3)]">
             Prompt Studio
           </h1>
           <p className="text-muted-foreground font-light">Craft, refine, and perfect your AI prompts with intelligent orchestration.</p>
@@ -243,8 +245,8 @@ export default function BuilderPage() {
 
         {hasProgress && (
           <div className="flex justify-end mb-6">
-            <Button variant="outline" size="sm" onClick={handleStartNew} className="glass-card border-violet-500/20 hover:bg-violet-500/10 hover:border-violet-500/50 hover:text-violet-100 transition-all shadow-[0_0_15px_-5px_rgba(139,92,246,0.2)]">
-              <RotateCcw className="mr-2 h-4 w-4 text-violet-400" />
+            <Button variant="outline" size="sm" onClick={handleStartNew} className="glass-card border-orange-500/20 hover:bg-orange-500/10 hover:border-orange-500/50 hover:text-orange-100 transition-all shadow-[0_0_15px_-5px_rgba(235,117,47,0.2)]">
+              <RotateCcw className="mr-2 h-4 w-4 text-orange-400" />
               Start New Prompt
             </Button>
           </div>
@@ -305,8 +307,8 @@ export default function BuilderPage() {
           {state.currentStep === "intake" && (
             <Tabs defaultValue="build" className="space-y-6 animate-in fade-in duration-500">
               <TabsList className="grid w-full grid-cols-2 max-w-md bg-background/50 border border-white/5 h-12 p-1">
-                <TabsTrigger value="build" className="rounded-lg data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-100 data-[state=active]:shadow-[0_0_15px_-3px_rgba(139,92,246,0.3)] transition-all">Build New Prompt</TabsTrigger>
-                <TabsTrigger value="analyze" className="rounded-lg data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-100 data-[state=active]:shadow-[0_0_15px_-3px_rgba(139,92,246,0.3)] transition-all">Analyze Existing Prompt</TabsTrigger>
+                <TabsTrigger value="build" className="rounded-lg data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-100 data-[state=active]:shadow-[0_0_15px_-3px_rgba(235,117,47,0.3)] transition-all">Build New Prompt</TabsTrigger>
+                <TabsTrigger value="analyze" className="rounded-lg data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-100 data-[state=active]:shadow-[0_0_15px_-3px_rgba(235,117,47,0.3)] transition-all">Analyze Existing Prompt</TabsTrigger>
               </TabsList>
 
               <TabsContent value="build" className="mt-0 outline-none">

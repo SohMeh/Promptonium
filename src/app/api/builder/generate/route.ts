@@ -12,8 +12,8 @@ export async function POST(request: Request) {
 
     const { system, user } = buildPromptGenerationPrompt(intake, refinedIntent);
 
-    // Route to free model if user selected free open models
-    if (intake.useOpenModel) {
+    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
+    if (useOpenModel) {
       return handleFreeModelGenerate(system, user);
     }
 

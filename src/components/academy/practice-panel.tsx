@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import type { PracticeScenario } from "@/lib/types/lesson";
 import type { EvaluationRun, DimensionResult } from "@/lib/types/evaluation";
+import { useModel } from "@/context/model-context";
 
 interface PracticePanelProps {
   practice: PracticeScenario;
@@ -48,6 +49,7 @@ export function PracticePanel({
   const [hintsRevealed, setHintsRevealed] = useState(0);
   const [showExample, setShowExample] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { useOpenModel } = useModel();
 
   const handleSubmit = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -57,7 +59,7 @@ export function PracticePanel({
     try {
       const res = await fetch("/api/academy/progress", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
         body: JSON.stringify({ pathId, lessonId, promptContent: prompt }),
       });
 
@@ -72,7 +74,7 @@ export function PracticePanel({
     } finally {
       setIsLoading(false);
     }
-  }, [prompt, pathId, lessonId, onComplete]);
+  }, [prompt, pathId, lessonId, onComplete, useOpenModel]);
 
   const handleRevealHint = () => {
     if (hintsRevealed < practice.hints.length) {
@@ -166,6 +168,11 @@ export function PracticePanel({
               "Submit & Evaluate"
             )}
           </Button>
+          {isLoading && useOpenModel && (
+            <p className="text-xs text-muted-foreground text-center animate-pulse">
+              Free model may take 10–30s…
+            </p>
+          )}
         </CardContent>
       </Card>
 

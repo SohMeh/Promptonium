@@ -12,8 +12,9 @@ export async function POST(request: Request) {
     };
 
     const registry = getProviderRegistry();
-    const provider = intake.useOpenModel
-      ? registry.get("free") || registry.getDefault()
+    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
+    const provider = useOpenModel
+      ? registry.get("free") ?? registry.getDefault()
       : registry.getDefault();
     const { system, user } = buildClarifyPrompt(intake, refinedIntent, answers);
 

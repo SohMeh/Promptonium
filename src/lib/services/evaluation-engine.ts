@@ -2,6 +2,7 @@ import type { PromptContent, BuilderIntake } from "@/lib/types/prompt";
 import type { EvaluationRun, DimensionResult, RubricDimension, RubricConfig } from "@/lib/types/evaluation";
 import { DEFAULT_RUBRIC_WEIGHTS } from "@/lib/types/evaluation";
 import { getProviderRegistry } from "@/lib/providers";
+import type { LLMProvider } from "@/lib/types/provider";
 import { buildEvaluationPrompt } from "@/lib/builder/prompt-templates";
 import { PE_TIPS } from "@/lib/data/pe-tips";
 
@@ -117,12 +118,13 @@ function checkEfficiency(prompt: PromptContent): DimensionResult {
 
 async function runLLMJudge(
   prompt: PromptContent,
-  intake: BuilderIntake
+  intake: BuilderIntake,
+  provider?: LLMProvider
 ): Promise<DimensionResult[]> {
-  const provider = getProviderRegistry().getDefault();
+  const resolvedProvider = provider ?? getProviderRegistry().getDefault();
   const { system, user } = buildEvaluationPrompt(prompt, intake);
 
-  const result = await provider.generate(user, {
+  const result = await resolvedProvider.generate(user, {
     systemPrompt: system,
     temperature: 0.2,
     maxTokens: 2048,
@@ -152,14 +154,15 @@ async function runLLMJudge(
 export async function evaluatePrompt(
   prompt: PromptContent,
   intake: BuilderIntake,
-  rubricConfig?: RubricConfig
+  rubricConfig?: RubricConfig,
+  provider?: LLMProvider
 ): Promise<EvaluationRun> {
   const weights = rubricConfig?.weights || DEFAULT_RUBRIC_WEIGHTS;
 
   const instructionResult = checkInstructionCompliance(prompt, intake);
   const efficiencyResult = checkEfficiency(prompt);
 
-  const llmResults = await runLLMJudge(prompt, intake);
+  const llmResults = await runLLMJudge(prompt, intake, provider);
 
   const allDimensions = [instructionResult, efficiencyResult, ...llmResults];
 

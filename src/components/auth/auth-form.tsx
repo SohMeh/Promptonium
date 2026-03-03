@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,6 @@ type AuthFormProps = {
 };
 
 export function AuthForm({ mode }: AuthFormProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [name, setName] = useState("");
@@ -40,44 +40,38 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (isSignup) {
         const signupResponse = await fetch("/api/auth/signup", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name,
-            email,
-            password,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
         });
 
         const signupData = await signupResponse.json();
         if (!signupResponse.ok) {
-          setError(signupData.error || "Authentication failed");
+          setError(signupData.error || "Sign up failed");
           return;
         }
       }
 
-      const loginResponse = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
       });
 
-      if (!loginResponse.ok) {
-        const loginData = await loginResponse.json().catch(() => ({}));
-        setError(loginData.error || "Invalid email or password");
+      if (result?.error) {
+        setError("Invalid email or password");
         return;
       }
 
-      router.push(redirectPath);
-      router.refresh();
+      window.location.href = redirectPath;
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleOAuth(provider: string) {
+    signIn(provider, { callbackUrl: redirectPath });
   }
 
   return (
@@ -163,40 +157,26 @@ export function AuthForm({ mode }: AuthFormProps) {
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  window.location.href = `/api/auth/signin/google?callbackUrl=${encodeURIComponent(redirectPath)}`;
-                }}
-              >
+            <p className="text-center text-sm font-medium text-red-500">
+              OAuth sign-in is currently unavailable. Please use email and password.
+            </p>
+
+            <div className="grid gap-2 pointer-events-none opacity-50">
+              <Button type="button" variant="outline" onClick={() => handleOAuth("google")}>
                 Google
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  window.location.href = `/api/auth/signin/github?callbackUrl=${encodeURIComponent(redirectPath)}`;
-                }}
-              >
+              <Button type="button" variant="outline" onClick={() => handleOAuth("github")}>
                 <Github className="mr-2 h-4 w-4" />
                 GitHub
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  window.location.href = `/api/auth/signin/facebook?callbackUrl=${encodeURIComponent(redirectPath)}`;
-                }}
-              >
+              <Button type="button" variant="outline" onClick={() => handleOAuth("facebook")}>
                 Facebook
               </Button>
             </div>
           </form>
 
           <p className="mt-4 text-sm text-muted-foreground">
-            {isSignup ? "Already have an account?" : "Don’t have an account?"}{" "}
+            {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
             <Link
               className="font-medium text-primary hover:underline"
               href={isSignup ? `/login?redirect=${encodeURIComponent(redirectPath)}` : `/signup?redirect=${encodeURIComponent(redirectPath)}`}

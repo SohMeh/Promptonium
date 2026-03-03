@@ -27,8 +27,8 @@ const MODES = [
       "Create optimized prompts for any AI model with guided intake, clarifying questions, and quality scoring.",
     href: "/builder",
     icon: Wand2,
-    gradient: "from-violet-500 to-purple-600",
-    bg: "bg-violet-50 dark:bg-violet-950/20",
+    gradient: "from-orange-500 to-amber-600",
+    bg: "bg-orange-50 dark:bg-orange-950/20",
     cta: "Start Building",
   },
   {
@@ -37,8 +37,8 @@ const MODES = [
       "Test your prompting skills with timed challenges, earn scores, and climb the leaderboard.",
     href: "/arena",
     icon: Swords,
-    gradient: "from-blue-500 to-cyan-600",
-    bg: "bg-blue-50 dark:bg-blue-950/20",
+    gradient: "from-amber-500 to-orange-600",
+    bg: "bg-amber-50 dark:bg-amber-950/20",
     cta: "Enter Arena",
   },
   {
@@ -89,8 +89,8 @@ const SUGGESTED_PATH = [
     desc: "Use the Builder to create an optimized, production-ready prompt with AI guidance.",
     href: "/builder",
     icon: Wand2,
-    color: "text-violet-600",
-    bg: "bg-violet-100 dark:bg-violet-900/30",
+    color: "text-orange-600",
+    bg: "bg-orange-100 dark:bg-orange-900/30",
   },
   {
     step: "3",
@@ -98,8 +98,8 @@ const SUGGESTED_PATH = [
     desc: "Challenge yourself in the Arena with timed exercises and see how you score.",
     href: "/arena",
     icon: Swords,
-    color: "text-blue-600",
-    bg: "bg-blue-100 dark:bg-blue-900/30",
+    color: "text-amber-600",
+    bg: "bg-amber-100 dark:bg-amber-900/30",
   },
 ];
 
@@ -130,8 +130,8 @@ export default function Home() {
     <div className="flex flex-col">
       {/* Hero */}
       <section className="container mx-auto px-4 pt-16 pb-12 text-center">
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 bg-clip-text text-transparent leading-tight">
-          Promptonium
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-4 leading-tight font-mono">
+          <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 bg-clip-text text-transparent">Promptonium</span>
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
           Create better prompts. Practice with challenges. Master prompt
@@ -218,7 +218,7 @@ export default function Home() {
 
             {STEPS.map((step, idx) => (
               <div key={idx} className="relative text-center group">
-                <div className="mx-auto w-12 h-12 flex items-center justify-center rounded-2xl bg-background border border-primary/30 text-primary font-black mb-6 shadow-[0_0_15px_-3px_rgba(139,92,246,0.3)] group-hover:scale-110 transition-transform duration-300 group-hover:border-primary/60 group-hover:shadow-[0_0_20px_0_rgba(139,92,246,0.5)] z-10 relative">
+                <div className="mx-auto w-12 h-12 flex items-center justify-center rounded-2xl bg-background border border-primary/30 text-primary font-black mb-6 shadow-[0_0_15px_-3px_rgba(235,117,47,0.3)] group-hover:scale-110 transition-transform duration-300 group-hover:border-primary/60 group-hover:shadow-[0_0_20px_0_rgba(235,117,47,0.5)] z-10 relative">
                   {step.num}
                 </div>
                 <h3 className="text-lg font-bold text-white mb-3">{step.title}</h3>
@@ -258,14 +258,14 @@ export default function Home() {
       {/* CTA */}
       <section className="container mx-auto px-4 pb-24 relative z-10">
         <div className="glass-card rounded-3xl p-1 max-w-4xl mx-auto overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-violet-600/30 via-transparent to-cyan-600/30 opacity-50" />
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-600/30 via-transparent to-amber-600/30 opacity-50" />
           <div className="relative bg-background/80 backdrop-blur-md rounded-[22px] p-10 md:p-16 text-center border border-white/5">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Ready to build better prompts?</h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
               Start with the Builder for instant results, or dive into the Academy to master the fundamentals of prompt engineering.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="h-12 px-8 font-semibold shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)]" asChild>
+              <Button size="lg" className="h-12 px-8 font-semibold shadow-[0_0_20px_-5px_rgba(235,117,47,0.4)]" asChild>
                 <Link href="/builder">Open Prompt Builder</Link>
               </Button>
               <Button size="lg" variant="secondary" className="h-12 px-8 font-semibold bg-white/5 hover:bg-white/10" asChild>

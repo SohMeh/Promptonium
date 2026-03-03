@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
+import { useModel } from "@/context/model-context";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +12,9 @@ import {
   Swords,
   GraduationCap,
   Library,
+  Linkedin,
   Zap,
+  Globe,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -22,38 +26,13 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [userName, setUserName] = useState<string | null>(null);
+  const { data: session } = useSession();
 
-  useEffect(() => {
-    let active = true;
+  const userName = session?.user?.name ?? null;
+  const { useOpenModel, toggleModel } = useModel();
 
-    async function loadSession() {
-      try {
-        const response = await fetch("/api/auth/session");
-        if (!response.ok) {
-          if (active) setUserName(null);
-          return;
-        }
-
-        const data = await response.json();
-        if (active) {
-          setUserName(data.user?.name ?? null);
-        }
-      } catch {
-        if (active) setUserName(null);
-      }
-    }
-
-    loadSession();
-
-    return () => {
-      active = false;
-    };
-  }, [pathname]);
-
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+  function handleLogout() {
+    signOut({ callbackUrl: "/login" });
   }
 
   return (
@@ -61,11 +40,16 @@ export function Sidebar() {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 border-r bg-sidebar/50 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/30">
         <div className="p-6 flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-violet-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/20">
-            <Zap className="h-4 w-4 fill-white" />
-          </div>
-          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent tracking-tight">
-            Promptonium
+          <Image
+            src="/logo.png"
+            alt="Promptonium logo"
+            width={32}
+            height={32}
+            unoptimized
+            className="h-8 w-8 rounded-lg object-contain"
+          />
+          <Link href="/" className="text-xl font-bold tracking-tight font-mono">
+            <span className="text-foreground">Promptonium</span><span className="text-primary">_.</span>
           </Link>
         </div>
 
@@ -79,8 +63,8 @@ export function Sidebar() {
                   variant={isActive ? "secondary" : "ghost"}
                   className={cn(
                     "w-full justify-start gap-3 h-11 transition-all duration-300",
-                    isActive 
-                      ? "bg-primary/10 text-primary hover:bg-primary/15 shadow-sm ring-1 ring-primary/20" 
+                    isActive
+                      ? "bg-primary/10 text-primary hover:bg-primary/15 shadow-sm ring-1 ring-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 hover:shadow-sm"
                   )}
                 >
@@ -94,11 +78,64 @@ export function Sidebar() {
           })}
         </nav>
 
+        <div className="px-4 py-3 border-t border-border/50">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Created by Sohum Mehta</span>
+            <a
+              href="https://www.linkedin.com/in/sohummehta/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:text-primary/80 transition-colors"
+              aria-label="Sohum Mehta on LinkedIn"
+            >
+              <Linkedin className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+
+        {/* AI Engine toggle */}
+        <div className="px-4 pb-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-1">
+            AI Engine
+          </p>
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => useOpenModel && toggleModel()}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
+                !useOpenModel
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              <Zap className="h-3 w-3" />
+              API Key (currently down)
+            </button>
+            <button
+              type="button"
+              onClick={() => !useOpenModel && toggleModel()}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
+                useOpenModel
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              <Globe className="h-3 w-3" />
+              Free
+            </button>
+          </div>
+          {useOpenModel && (
+            <p className="text-[10px] text-muted-foreground mt-1.5 px-1">
+              Free model may take 10–30s
+            </p>
+          )}
+        </div>
+
         <div className="p-4 border-t border-border/50">
           {userName ? (
             <div className="space-y-3">
               <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-violet-500/20 to-cyan-500/20 border border-primary/20 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
                   <span className="text-xs font-bold text-primary">
                     {userName.slice(0, 2).toUpperCase()}
                   </span>
@@ -139,7 +176,7 @@ export function Sidebar() {
                 )}>
                   <div className={cn(
                     "p-1.5 rounded-xl transition-all duration-300",
-                    isActive && "bg-primary/15 ring-1 ring-primary/30 shadow-[0_0_15px_-3px_rgba(139,92,246,0.3)]"
+                    isActive && "bg-primary/15 ring-1 ring-primary/30 shadow-[0_0_15px_-3px_rgba(235,117,47,0.3)]"
                   )}>
                     <Icon className="h-5 w-5" />
                   </div>
