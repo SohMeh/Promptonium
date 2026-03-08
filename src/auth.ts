@@ -86,15 +86,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session: sessionData }) {
       if (user?.id) {
         token.sub = user.id;
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: { emailVerified: true },
+        });
+        token.emailVerified = dbUser?.emailVerified ?? null;
+      }
+      // Allow client to trigger a session refresh after email verification
+      if (trigger === "update" && sessionData?.refreshEmailVerified) {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.sub! },
+          select: { emailVerified: true },
+        });
+        token.emailVerified = dbUser?.emailVerified ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        session.user.emailVerified = (token.emailVerified as Date | null) ?? null;
       }
       return session;
     },

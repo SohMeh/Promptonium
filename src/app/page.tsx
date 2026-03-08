@@ -131,7 +131,7 @@ export default function Home() {
       {/* Hero */}
       <section className="container mx-auto px-4 pt-16 pb-12 text-center">
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-4 leading-tight font-mono">
-          <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 bg-clip-text text-transparent">Promptonium</span>
+          <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 bg-clip-text text-transparent">Promptonium</span><span className="text-primary">_.</span>
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
           Create better prompts. Practice with challenges. Master prompt

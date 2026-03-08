@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,6 +39,12 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (isSignup) {
+        // Client-side password match check
+        if (password !== confirmPassword) {
+          setError("Passwords do not match");
+          return;
+        }
+
         const signupResponse = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -49,16 +56,29 @@ export function AuthForm({ mode }: AuthFormProps) {
           setError(signupData.error || "Sign up failed");
           return;
         }
+
+        // Auto-login after signup, then redirect to verify page
+        const result = await signIn("credentials", { email, password, redirect: false });
+        if (result?.error) {
+          setError("Account created but login failed. Please log in manually.");
+          return;
+        }
+        window.location.href = "/verify-email";
+        return;
       }
 
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
+      // Login flow
+      const result = await signIn("credentials", { email, password, redirect: false });
 
       if (result?.error) {
         setError("Invalid email or password");
+        return;
+      }
+
+      // Check if user needs to verify email
+      const session = await getSession();
+      if (session?.user && !session.user.emailVerified) {
+        window.location.href = "/verify-email";
         return;
       }
 
@@ -133,6 +153,25 @@ export function AuthForm({ mode }: AuthFormProps) {
                 required
               />
             </div>
+
+            {isSignup ? (
+              <div className="space-y-2">
+                <label htmlFor="confirmPassword" className="text-sm font-medium">
+                  Confirm password
+                </label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder="Repeat your password"
+                  minLength={8}
+                  required
+                />
+              </div>
+            ) : null}
 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

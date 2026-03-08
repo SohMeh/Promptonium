@@ -41,11 +41,10 @@ export function Sidebar() {
       <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 border-r bg-sidebar/50 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/30">
         <div className="p-6 flex items-center gap-2">
           <Image
-            src="/logo.png"
+            src="/icon.png"
             alt="Promptonium logo"
             width={32}
             height={32}
-            unoptimized
             className="h-8 w-8 rounded-lg object-contain"
           />
           <Link href="/" className="text-xl font-bold tracking-tight font-mono">

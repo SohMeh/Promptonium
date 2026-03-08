@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -14,10 +16,7 @@ export async function POST(request: Request) {
     }
 
     if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
     const existingUser = await db.user.findUnique({ where: { email } });
@@ -30,28 +29,35 @@ export async function POST(request: Request) {
     const user = existingUser
       ? await db.user.update({
           where: { id: existingUser.id },
-          data: {
-            name: existingUser.name ?? name,
-            passwordHash,
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          data: { name: existingUser.name ?? name, passwordHash },
+          select: { id: true, name: true, email: true },
         })
       : await db.user.create({
-          data: {
-            name,
-            email,
-            passwordHash,
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          data: { name, email, passwordHash },
+          select: { id: true, name: true, email: true },
         });
+
+    // Generate 6-digit code and store its hash
+    const rawCode = String(crypto.randomInt(100000, 999999));
+    const codeHash = await bcrypt.hash(rawCode, 10);
+
+    // Delete any existing codes for this email, then create new one
+    await db.emailVerificationCode.deleteMany({ where: { email } });
+    await db.emailVerificationCode.create({
+      data: {
+        email,
+        codeHash,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+      },
+    });
+
+    // Send email (non-blocking — failure shouldn't break signup)
+    try {
+      await sendVerificationEmail(email, rawCode);
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+      // Continue — user can request resend later
+    }
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
