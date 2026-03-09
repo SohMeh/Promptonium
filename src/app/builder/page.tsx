@@ -335,11 +335,13 @@ export default function BuilderPage() {
             </div>
           )}
 
-          {state.currentStep === "generate" && (
+          {(state.currentStep === "generate" || (state.currentStep === "evaluate" && !state.evaluation)) && (
             <div className="animate-in slide-in-from-right-4 fade-in duration-500">
               <GeneratePanel
                 streamingContent={state.streamingContent}
-                isLoading={state.isLoading}
+                isLoading={state.currentStep === "generate" && state.isLoading}
+                generatedPrompt={state.generatedPrompt}
+                isEvaluating={state.currentStep === "evaluate" && state.isLoading}
               />
             </div>
           )}

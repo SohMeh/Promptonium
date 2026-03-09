@@ -56,6 +56,9 @@ export async function POST(request: Request) {
       await sendVerificationEmail(email, rawCode);
     } catch (emailError) {
       console.error("Failed to send verification email:", emailError);
+      if (!process.env.RESEND_API_KEY) {
+        console.log(`[DEV] Verification code for ${email}: ${rawCode}`);
+      }
       // Continue — user can request resend later
     }
 
