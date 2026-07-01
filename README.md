@@ -1,5 +1,5 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-<img width="100" height="100" alt="promptonium_newlogo2" src="https://github.com/user-attachments/assets/0098c96d-3417-4806-bbc0-066a1deb5ea3" />
+<img width="10" height="10" alt="promptonium_newlogo2" src="https://github.com/user-attachments/assets/0098c96d-3417-4806-bbc0-066a1deb5ea3" />
 
 ## Authentication + Database Setup
 
