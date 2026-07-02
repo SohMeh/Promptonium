@@ -51,14 +51,14 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         ...state,
         generatedPrompt: action.prompt,
         streamingContent: "",
-        currentStep: "evaluate",
         isLoading: false,
+        // step stays "generate" — handleEvaluate transitions to "evaluate"
       };
     case "EVALUATION_COMPLETE":
       return {
         ...state,
         evaluation: action.evaluation,
-        currentStep: "improve",
+        currentStep: "evaluate",
         isLoading: false,
       };
     case "UPDATE_PROMPT_SECTION":

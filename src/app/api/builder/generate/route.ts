@@ -1,6 +1,6 @@
 import { buildPromptGenerationPrompt } from "@/lib/builder/prompt-templates";
 import type { BuilderIntake } from "@/lib/types/prompt";
-import { getProviderRegistry } from "@/lib/providers";
+import { getProviderRegistry, getUserApiKey, isOpenModelRequest } from "@/lib/providers";
 import Anthropic from "@anthropic-ai/sdk";
 
 export async function POST(request: Request) {
@@ -12,12 +12,18 @@ export async function POST(request: Request) {
 
     const { system, user } = buildPromptGenerationPrompt(intake, refinedIntent);
 
-    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
-    if (useOpenModel) {
+    if (isOpenModelRequest(request)) {
       return handleFreeModelGenerate(system, user);
     }
 
-    return handleAnthropicStream(system, user);
+    // The user's own key takes priority; fall back to the server key,
+    // then to the free provider so signed-in users always get output.
+    const apiKey = getUserApiKey(request) ?? process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return handleFreeModelGenerate(system, user);
+    }
+
+    return handleAnthropicStream(system, user, apiKey);
   } catch (error) {
     console.error("Builder generate error:", error);
     return new Response(JSON.stringify({ error: "Failed to generate prompt" }), {
@@ -27,15 +33,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function handleAnthropicStream(system: string, user: string) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: "Anthropic API key not configured" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
+async function handleAnthropicStream(system: string, user: string, apiKey: string) {
   const client = new Anthropic({ apiKey });
 
   const stream = await client.messages.stream({

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { evaluatePrompt } from "@/lib/services/evaluation-engine";
-import { getProviderRegistry } from "@/lib/providers";
+import { resolveProviderFromRequest } from "@/lib/providers";
 import type { PromptContent, BuilderIntake } from "@/lib/types/prompt";
 
 export async function POST(request: Request) {
@@ -14,11 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Prompt content is required" }, { status: 400 });
     }
 
-    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
-    const registry = getProviderRegistry();
-    const provider = useOpenModel
-      ? registry.get("free") ?? registry.getDefault()
-      : registry.getDefault();
+    const provider = resolveProviderFromRequest(request);
 
     const evaluation = await evaluatePrompt(promptContent, intake, undefined, provider);
     return NextResponse.json(evaluation);

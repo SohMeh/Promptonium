@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProviderRegistry } from "@/lib/providers";
+import { resolveProviderFromRequest, isOpenModelRequest } from "@/lib/providers";
 import { buildIntakeAnalysisPrompt } from "@/lib/builder/prompt-templates";
 import type { BuilderIntake } from "@/lib/types/prompt";
 
@@ -11,11 +11,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Objective is required" }, { status: 400 });
     }
 
-    const registry = getProviderRegistry();
-    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
-    const provider = useOpenModel
-      ? registry.get("free") ?? registry.getDefault()
-      : registry.getDefault();
+    const useOpenModel = isOpenModelRequest(request);
+    const provider = resolveProviderFromRequest(request);
 
     const { system, user } = buildIntakeAnalysisPrompt(intake);
 
