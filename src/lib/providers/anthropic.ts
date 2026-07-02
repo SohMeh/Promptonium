@@ -14,7 +14,7 @@ export class AnthropicProvider extends BaseLLMProvider {
 
   async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult> {
     const response = await this.client.messages.create({
-      model: options.model || "claude-sonnet-4-20250514",
+      model: options.model || "claude-opus-4-8",
       max_tokens: options.maxTokens || 4096,
       system: options.systemPrompt || "",
       messages: [{ role: "user", content: prompt }],

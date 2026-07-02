@@ -37,8 +37,9 @@ async function handleAnthropicStream(system: string, user: string, apiKey: strin
   const client = new Anthropic({ apiKey });
 
   const stream = await client.messages.stream({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4096,
+    model: "claude-opus-4-8",
+    max_tokens: 16000,
+    thinking: { type: "adaptive" },
     system,
     messages: [{ role: "user", content: user }],
   });

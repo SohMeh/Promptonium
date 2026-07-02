@@ -10,6 +10,13 @@ export async function POST(request: Request) {
   if (limited) return limited;
 
   try {
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json(
+        { error: "Password reset emails are not configured on this server. Contact the administrator." },
+        { status: 503 }
+      );
+    }
+
     const { email } = await request.json();
 
     if (!email || typeof email !== "string") {
