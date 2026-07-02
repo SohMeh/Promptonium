@@ -12,7 +12,7 @@ import { builderReducer } from "@/lib/builder/actions";
 import { INITIAL_STATE, type BuilderStep, type BuilderState } from "@/lib/builder/state";
 import { parsePromptSections } from "@/lib/builder/prompt-templates";
 import type { BuilderIntake, PromptContent } from "@/lib/types/prompt";
-import { saveProject, getBuilderState, saveBuilderState, clearBuilderState } from "@/lib/services/storage";
+import { saveProject, getProjects, getBuilderState, saveBuilderState, clearBuilderState } from "@/lib/services/storage";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
@@ -22,15 +22,16 @@ import { useModel } from "@/context/model-context";
 function loadPersistedState(): BuilderState {
   const saved = getBuilderState<BuilderState>();
   if (!saved) return INITIAL_STATE;
-  // Always reset transient fields
-  return { ...saved, isLoading: false, error: null, streamingContent: "" };
+  // Merge over INITIAL_STATE so fields added later get defaults;
+  // always reset transient fields.
+  return { ...INITIAL_STATE, ...saved, isLoading: false, error: null, streamingContent: "" };
 }
 
 export default function BuilderPage() {
   const [state, dispatch] = useReducer(builderReducer, INITIAL_STATE, loadPersistedState);
   const [savedToVault, setSavedToVault] = useState(false);
   const isFirstRender = useRef(true);
-  const { useOpenModel } = useModel();
+  const { aiHeaders } = useModel();
 
   // Persist state to localStorage on every change (skip first render)
   useEffect(() => {
@@ -48,6 +49,19 @@ export default function BuilderPage() {
     dispatch({ type: "RESET" });
   }, []);
 
+  // Open a Vault project when arriving via /builder?project=<id>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get("project");
+    if (!projectId) return;
+    const project = getProjects().find((p) => p.id === projectId);
+    if (project && project.versions.length > 0) {
+      dispatch({ type: "LOAD_PROJECT", project });
+    }
+    // Drop the query param so refreshes don't re-load the project
+    window.history.replaceState(null, "", "/builder");
+  }, []);
+
   const handleEvaluate = useCallback(
     async (prompt: PromptContent, intake: BuilderIntake) => {
       dispatch({ type: "SET_LOADING", loading: true });
@@ -55,7 +69,7 @@ export default function BuilderPage() {
       try {
         const res = await fetch("/api/builder/evaluate", {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
+          headers: { "Content-Type": "application/json", ...aiHeaders() },
           body: JSON.stringify({ promptContent: prompt, intake }),
         });
         if (!res.ok) throw new Error("Evaluation failed");
@@ -65,7 +79,7 @@ export default function BuilderPage() {
         dispatch({ type: "SET_ERROR", error: (err as Error).message });
       }
     },
-    [useOpenModel]
+    [aiHeaders]
   );
 
   const handleGenerate = useCallback(
@@ -75,7 +89,7 @@ export default function BuilderPage() {
       try {
         const res = await fetch("/api/builder/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
+          headers: { "Content-Type": "application/json", ...aiHeaders() },
           body: JSON.stringify({ intake, refinedIntent }),
         });
         if (!res.ok) {
@@ -118,7 +132,7 @@ export default function BuilderPage() {
         dispatch({ type: "SET_ERROR", error: (err as Error).message });
       }
     },
-    [handleEvaluate, useOpenModel]
+    [handleEvaluate, aiHeaders]
   );
 
   const handleIntakeSubmit = useCallback(
@@ -127,7 +141,7 @@ export default function BuilderPage() {
       try {
         const res = await fetch("/api/builder/intake", {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
+          headers: { "Content-Type": "application/json", ...aiHeaders() },
           body: JSON.stringify(intake),
         });
         if (!res.ok) {
@@ -150,7 +164,7 @@ export default function BuilderPage() {
         dispatch({ type: "SET_ERROR", error: (err as Error).message });
       }
     },
-    [handleGenerate, useOpenModel]
+    [handleGenerate, aiHeaders]
   );
 
   const handleClarifySubmit = useCallback(async () => {
@@ -159,7 +173,7 @@ export default function BuilderPage() {
     try {
       const res = await fetch("/api/builder/clarify", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
+        headers: { "Content-Type": "application/json", ...aiHeaders() },
         body: JSON.stringify({
           intake: state.intake,
           answers: state.answers,
@@ -176,7 +190,7 @@ export default function BuilderPage() {
     } catch (err) {
       dispatch({ type: "SET_ERROR", error: (err as Error).message });
     }
-  }, [state.intake, state.answers, state.refinedIntent, handleGenerate, useOpenModel]);
+  }, [state.intake, state.answers, state.refinedIntent, handleGenerate, aiHeaders]);
 
   const handleReEvaluate = useCallback(async () => {
     if (!state.generatedPrompt || !state.intake) return;
@@ -198,28 +212,49 @@ export default function BuilderPage() {
 
   const handleSave = useCallback(() => {
     if (!state.generatedPrompt || !state.intake) return;
-    const id = `proj_${Date.now()}`;
-    const versionId = `ver_${Date.now()}`;
-    saveProject({
-      id,
-      title: state.intake.objective.slice(0, 60),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      versions: [
-        {
-          id: versionId,
-          projectId: id,
-          content: state.generatedPrompt,
-          evaluation: state.evaluation,
-          createdAt: Date.now(),
-        },
-      ],
-      tags: [state.intake.taskType],
-      modelTarget: state.intake.modelTarget,
-      sourceMode: "builder",
-    });
+    const now = Date.now();
+
+    // Saving an opened project appends a version instead of duplicating it
+    const existing = state.projectId
+      ? getProjects().find((p) => p.id === state.projectId)
+      : undefined;
+
+    if (existing) {
+      existing.versions.push({
+        id: `ver_${now}`,
+        projectId: existing.id,
+        content: state.generatedPrompt,
+        evaluation: state.evaluation,
+        createdAt: now,
+      });
+      existing.updatedAt = now;
+      existing.intake = state.intake;
+      saveProject(existing);
+    } else {
+      const id = `proj_${now}`;
+      saveProject({
+        id,
+        title: state.intake.objective.slice(0, 60),
+        createdAt: now,
+        updatedAt: now,
+        versions: [
+          {
+            id: `ver_${now}`,
+            projectId: id,
+            content: state.generatedPrompt,
+            evaluation: state.evaluation,
+            createdAt: now,
+          },
+        ],
+        tags: [state.intake.taskType],
+        modelTarget: state.intake.modelTarget,
+        sourceMode: "builder",
+        intake: state.intake,
+      });
+      dispatch({ type: "PROJECT_SAVED", projectId: id });
+    }
     setSavedToVault(true);
-  }, [state.generatedPrompt, state.intake, state.evaluation]);
+  }, [state.generatedPrompt, state.intake, state.evaluation, state.projectId]);
 
   const handleStepClick = useCallback((step: BuilderStep) => {
     dispatch({ type: "SET_STEP", step });

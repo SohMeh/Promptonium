@@ -97,7 +97,7 @@ export function PromptDetail({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/builder">
+          <Link href={`/builder?project=${encodeURIComponent(project.id)}`}>
             <Button variant="outline" size="sm">
               <ExternalLink className="size-4 mr-1" />
               Open in Builder

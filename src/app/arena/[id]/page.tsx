@@ -47,7 +47,7 @@ export default function ChallengePage({
   const [personalBest, setPersonalBest] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
-  const { useOpenModel } = useModel();
+  const { useOpenModel, aiHeaders } = useModel();
 
   const handleSubmit = useCallback(
     async (text?: string) => {
@@ -68,7 +68,7 @@ export default function ChallengePage({
       try {
         const response = await fetch("/api/arena/attempt", {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
+          headers: { "Content-Type": "application/json", ...aiHeaders() },
           body: JSON.stringify({
             challengeId: challenge.id,
             promptContent: content,
@@ -109,7 +109,7 @@ export default function ChallengePage({
         isSubmittingRef.current = false;
       }
     },
-    [challenge, promptText, startedAt, useOpenModel]
+    [challenge, promptText, startedAt, aiHeaders]
   );
 
   const handleStart = useCallback(() => {

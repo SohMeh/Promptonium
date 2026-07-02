@@ -80,6 +80,7 @@ export function ProfilePanel() {
     const stats = computeStats();
     const updated = { ...p, stats };
     saveProfile(updated);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage hydration must run post-mount
     setProfile(updated);
     setDisplayName(updated.displayName);
   }, [computeStats]);

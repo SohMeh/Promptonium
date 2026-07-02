@@ -65,6 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: true,
             name: true,
             passwordHash: true,
+            emailVerified: true,
           },
         });
 
@@ -77,6 +78,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // No email service configured means verification codes can never be
+        // delivered — verify legacy unverified accounts on successful login.
+        if (!user.emailVerified && !process.env.RESEND_API_KEY) {
+          await db.user.update({
+            where: { id: user.id },
+            data: { emailVerified: new Date() },
+          });
+        }
+
         return {
           id: user.id,
           email: user.email,
@@ -86,9 +96,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session: sessionData }) {
+    async jwt({ token, user, account, trigger, session: sessionData }) {
       if (user?.id) {
         token.sub = user.id;
+
+        // OAuth providers have already verified the email address.
+        const isOAuth = account && account.provider !== "credentials";
+        if (isOAuth) {
+          await db.user.updateMany({
+            where: { id: user.id, emailVerified: null },
+            data: { emailVerified: new Date() },
+          });
+        }
+
         const dbUser = await db.user.findUnique({
           where: { id: user.id },
           select: { emailVerified: true },
@@ -114,7 +134,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async signIn({ user }) {
       if (user?.id) {
-        await db.user.update({
+        // updateMany: new OAuth users are not persisted yet at this point,
+        // and a strict update on a missing row would abort the sign-in.
+        await db.user.updateMany({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
         });

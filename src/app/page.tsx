@@ -1,279 +1,441 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Wand2,
   Swords,
   GraduationCap,
   ArrowRight,
-  CheckCircle2,
-  BookOpen,
-  Trophy,
-  Zap,
-  X,
+  ArrowDown,
+  Library,
+  KeyRound,
+  UserRound,
+  Globe,
   Sparkles,
 } from "lucide-react";
-import { getProgress, getProjects } from "@/lib/services/storage";
+import { getProgress, getProjects, getAttempts } from "@/lib/services/storage";
 import { LEARNING_PATHS } from "@/data/academy/paths";
 import { CHALLENGES } from "@/data/challenges";
 
+const TICKER_TERMS = [
+  "chain-of-thought",
+  "few-shot examples",
+  "system prompts",
+  "role framing",
+  "output schemas",
+  "XML structure",
+  "constraint design",
+  "tone control",
+  "self-critique loops",
+  "delimiters",
+  "step decomposition",
+  "context windows",
+  "rubric scoring",
+  "instruction hierarchy",
+];
+
 const MODES = [
   {
+    number: "01",
     title: "Prompt Builder",
+    tagline: "From vague idea to production prompt",
     description:
-      "Create optimized prompts for any AI model with guided intake, clarifying questions, and quality scoring.",
+      "Describe what you need in plain words. The Builder interrogates your intent with smart clarifying questions, then assembles a structured, model-ready prompt — scored across six quality dimensions so you know exactly what to tighten.",
     href: "/builder",
+    cta: "Start building",
     icon: Wand2,
-    gradient: "from-orange-500 to-amber-600",
-    bg: "bg-orange-50 dark:bg-orange-950/20",
-    cta: "Start Building",
   },
   {
+    number: "02",
     title: "Prompt Arena",
+    tagline: "Skill under pressure",
     description:
-      "Test your prompting skills with timed challenges, earn scores, and climb the leaderboard.",
+      "Ten timed challenges across email, code, analysis, and creative writing. Submit your best prompt before the clock runs out, get a dimension-by-dimension verdict, and chase your own high score.",
     href: "/arena",
+    cta: "Enter the arena",
     icon: Swords,
-    gradient: "from-amber-500 to-orange-600",
-    bg: "bg-amber-50 dark:bg-amber-950/20",
-    cta: "Enter Arena",
   },
   {
+    number: "03",
     title: "Prompt Academy",
+    tagline: "Fundamentals to advanced technique",
     description:
-      "Learn prompt engineering from beginner to advanced through guided lessons and hands-on practice.",
+      "Twelve guided lessons across three learning paths, each ending in a hands-on practice checkpoint that's actually graded. Built for self-learners and educators alike — including ready-to-use classroom templates.",
     href: "/academy",
+    cta: "Start learning",
     icon: GraduationCap,
-    gradient: "from-emerald-500 to-teal-600",
-    bg: "bg-emerald-50 dark:bg-emerald-950/20",
-    cta: "Start Learning",
-  },
-] as const;
-
-const STEPS = [
-  {
-    num: "1",
-    title: "Describe your goal",
-    desc: "Tell us what you need the AI to do — we'll ask smart follow-up questions.",
   },
   {
-    num: "2",
-    title: "Get an optimized prompt",
-    desc: "We generate a structured, production-ready prompt tailored to your model.",
-  },
-  {
-    num: "3",
-    title: "Review & improve",
-    desc: "See dimension-level scoring and actionable tips to refine your prompt.",
+    number: "04",
+    title: "Prompt Vault",
+    tagline: "Your prompts, versioned",
+    description:
+      "Every prompt you build is saved with its evaluation history. Re-open any project in the Builder, iterate, and stack new versions — your personal library of proven prompts grows as you do.",
+    href: "/vault",
+    cta: "Open the vault",
+    icon: Library,
   },
 ];
 
-const WELCOME_DISMISSED_KEY = "promptonium:welcome-dismissed";
-
-const SUGGESTED_PATH = [
-  {
-    step: "1",
-    title: "Learn the fundamentals",
-    desc: "Start with a beginner lesson in the Academy to learn core prompting techniques.",
-    href: "/academy",
-    icon: GraduationCap,
-    color: "text-emerald-600",
-    bg: "bg-emerald-100 dark:bg-emerald-900/30",
-  },
-  {
-    step: "2",
-    title: "Build your first prompt",
-    desc: "Use the Builder to create an optimized, production-ready prompt with AI guidance.",
-    href: "/builder",
-    icon: Wand2,
-    color: "text-orange-600",
-    bg: "bg-orange-100 dark:bg-orange-900/30",
-  },
-  {
-    step: "3",
-    title: "Test your skills",
-    desc: "Challenge yourself in the Arena with timed exercises and see how you score.",
-    href: "/arena",
-    icon: Swords,
-    color: "text-amber-600",
-    bg: "bg-amber-100 dark:bg-amber-900/30",
-  },
+const JOURNEY = [
+  { step: "Learn", desc: "Pick up a technique in the Academy" },
+  { step: "Build", desc: "Apply it in the Builder with AI guidance" },
+  { step: "Test", desc: "Prove it in a timed Arena challenge" },
+  { step: "Iterate", desc: "Version and refine it in your Vault" },
 ];
 
-export default function Home() {
-  const progress = useMemo(() => getProgress(), []);
-  const projects = useMemo(() => getProjects(), []);
-  const [showWelcome, setShowWelcome] = useState(false);
+const BEFORE_PROMPT = `write me an email to my team about the deadline`;
+
+const AFTER_PROMPT = `You are an engineering manager writing to a
+team of 8 developers.
+
+TASK: Announce that the v2.0 release deadline
+moved from Mar 14 to Mar 28.
+
+CONSTRAINTS:
+- Under 150 words, no corporate filler
+- Lead with the change, then the reason
+- End with one clear ask
+
+OUTPUT: Subject line + body, ready to send.`;
+
+/** Adds .is-visible to .reveal children as they scroll into view. */
+function useRevealOnScroll<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
 
   useEffect(() => {
-    const dismissed = localStorage.getItem(WELCOME_DISMISSED_KEY);
-    if (!dismissed) setShowWelcome(true);
+    const root = ref.current;
+    if (!root) return;
+    const targets = root.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.15 }
+    );
+    targets.forEach((t) => observer.observe(t));
+    return () => observer.disconnect();
   }, []);
 
-  const dismissWelcome = () => {
-    localStorage.setItem(WELCOME_DISMISSED_KEY, "true");
-    setShowWelcome(false);
-  };
+  return ref;
+}
 
-  const lessonsCompleted = progress.filter((p) => p.completed).length;
-  const totalLessons = LEARNING_PATHS.reduce(
-    (s, p) => s + p.lessons.length,
-    0
+export default function Home() {
+  const pageRef = useRevealOnScroll<HTMLDivElement>();
+  const [stats, setStats] = useState<{ prompts: number; lessons: number; attempts: number } | null>(
+    null
   );
-  const promptsSaved = projects.length;
-  const challengeCount = CHALLENGES.length;
+
+  // Personal stats live in localStorage, so they only exist client-side
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage hydration must run post-mount
+    setStats({
+      prompts: getProjects().length,
+      lessons: getProgress().filter((p) => p.completed).length,
+      attempts: getAttempts().length,
+    });
+  }, []);
+
+  const totalLessons = LEARNING_PATHS.reduce((s, p) => s + p.lessons.length, 0);
 
   return (
-    <div className="flex flex-col">
-      {/* Hero */}
-      <section className="container mx-auto px-4 pt-16 pb-12 text-center">
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-4 leading-tight font-mono">
-          <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 bg-clip-text text-transparent">Promptonium</span><span className="text-primary">_.</span>
-        </h1>
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-          Create better prompts. Practice with challenges. Master prompt
-          engineering — all in one platform.
+    <div ref={pageRef} className="relative flex flex-col overflow-hidden">
+      {/* Atmosphere: ember orbs + grain */}
+      <div className="pointer-events-none absolute inset-0 grain" aria-hidden="true">
+        <div className="drift-slow absolute -top-40 -left-40 h-[34rem] w-[34rem] rounded-full bg-orange-600/15 blur-[120px]" />
+        <div className="drift-slower absolute top-[28rem] -right-48 h-[30rem] w-[30rem] rounded-full bg-amber-500/10 blur-[110px]" />
+        <div className="drift-slow absolute bottom-40 left-1/4 h-[24rem] w-[24rem] rounded-full bg-orange-500/8 blur-[100px]" />
+      </div>
+
+      {/* ---------------- Hero ---------------- */}
+      <section className="relative z-10 px-6 pt-20 pb-14 sm:pt-28 md:px-14 lg:px-20">
+        <p className="font-mono text-xs sm:text-sm text-primary/90 tracking-widest uppercase mb-6">
+          $ the element of better prompts<span className="blink-cursor">▌</span>
         </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Button size="lg" asChild>
+        <h1 className="font-display max-w-4xl text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold leading-[0.95] tracking-tight">
+          Rough idea in.
+          <br />
+          <span className="ember-text ember-glow">Precision prompt</span> out.
+        </h1>
+        <p className="mt-8 max-w-xl text-lg md:text-xl text-muted-foreground leading-relaxed">
+          Promptonium turns prompt engineering into a craft you can practice — build with AI
+          guidance, battle the clock, learn the theory, and keep every version you ship.
+        </p>
+
+        <div className="mt-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <Button
+            size="lg"
+            className="h-13 px-8 text-base font-semibold shadow-[0_0_35px_-8px_rgba(249,115,22,0.6)]"
+            asChild
+          >
             <Link href="/builder">
-              <Wand2 className="h-4 w-4 mr-2" />
-              Build a Prompt
+              <Wand2 className="h-5 w-5 mr-2" />
+              Build a prompt
             </Link>
           </Button>
-          <Button size="lg" variant="outline" asChild>
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-13 px-8 text-base border-primary/30 hover:border-primary/60 hover:bg-primary/10"
+            asChild
+          >
             <Link href="/academy">
               <GraduationCap className="h-5 w-5 mr-2" />
-              Start Learning
+              Learn the craft
             </Link>
           </Button>
         </div>
+        <p className="mt-5 font-mono text-xs text-muted-foreground">
+          No account needed to explore. AI features run on your account or your own API key.
+        </p>
       </section>
 
-      {/* Stats bar */}
-      <section className="relative z-10 my-8">
-        <div className="container mx-auto px-4">
-          <div className="glass-card rounded-2xl p-8 max-w-4xl mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-border/50">
-              {[
-                { label: "Prompts Saved", val: promptsSaved },
-                { label: "Arena Challenges", val: challengeCount },
-                { label: "Academy Lessons", val: totalLessons },
-                { label: "Lessons Completed", val: lessonsCompleted },
-              ].map((stat, i) => (
-                <div key={i} className="flex flex-col justify-center px-4">
-                  <div className="text-3xl font-black bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">{stat.val}</div>
-                  <div className="text-xs text-muted-foreground mt-1 uppercase tracking-wider font-semibold">{stat.label}</div>
-                </div>
+      {/* ---------------- Ticker ---------------- */}
+      <section
+        className="relative z-10 border-y border-primary/15 bg-primary/[0.04] py-3 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div className="marquee-track">
+          {[0, 1].map((copy) => (
+            <div key={copy} className="flex shrink-0 items-center">
+              {TICKER_TERMS.map((term) => (
+                <span
+                  key={`${copy}-${term}`}
+                  className="mx-6 flex items-center gap-6 font-mono text-sm text-muted-foreground/80 whitespace-nowrap"
+                >
+                  {term}
+                  <Sparkles className="h-3 w-3 text-primary/60" />
+                </span>
               ))}
             </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* Mode cards */}
-      <section className="container mx-auto px-4 py-16 relative z-10">
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {MODES.map((mode) => {
-            const Icon = mode.icon;
-            return (
-              <Link key={mode.href} href={mode.href} className="group outline-none">
-                <Card className="glass-card h-full transition-all duration-300 border border-white/5 rounded-2xl overflow-hidden relative">
-                  <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${mode.gradient} opacity-50 group-hover:opacity-100 transition-opacity`} />
-                  <CardContent className="p-8">
-                    <div className={`inline-flex items-center justify-center p-3 rounded-xl ${mode.bg} mb-6 ring-1 ring-white/10 group-hover:scale-110 transition-transform duration-300`}>
-                      <Icon className={`h-8 w-8 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]`} />
-                    </div>
-                    <h3 className="text-xl font-bold mb-3 text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-white/70 transition-all">
-                      {mode.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-                      {mode.description}
-                    </p>
-                    <span className="inline-flex items-center text-sm font-semibold text-white/80 group-hover:text-white transition-colors">
-                      {mode.cta}
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1.5 transition-transform" />
-                    </span>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+      {/* ---------------- Before / After ---------------- */}
+      <section className="relative z-10 px-6 py-24 md:px-14 lg:px-20">
+        <div className="reveal max-w-2xl">
+          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight">
+            The difference is <span className="ember-text">structure.</span>
+          </h2>
+          <p className="mt-4 text-muted-foreground text-lg">
+            Same intent. One gets a shrug from the model — the other gets exactly what you meant.
+          </p>
         </div>
-      </section>
 
-      {/* How it works */}
-      <section className="py-20 relative z-10">
-        <div className="absolute inset-0 bg-primary/5 border-y border-white/5 backdrop-blur-3xl" />
-        <div className="container mx-auto px-4 relative">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">How Prompt Builder Works</h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Experience a fluid, intelligent workflow designed to turn your ideas into highly effective AI prompts.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto relative">
-            <div className="hidden md:block absolute top-[24px] left-[15%] right-[15%] h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-
-            {STEPS.map((step, idx) => (
-              <div key={idx} className="relative text-center group">
-                <div className="mx-auto w-12 h-12 flex items-center justify-center rounded-2xl bg-background border border-primary/30 text-primary font-black mb-6 shadow-[0_0_15px_-3px_rgba(235,117,47,0.3)] group-hover:scale-110 transition-transform duration-300 group-hover:border-primary/60 group-hover:shadow-[0_0_20px_0_rgba(235,117,47,0.5)] z-10 relative">
-                  {step.num}
-                </div>
-                <h3 className="text-lg font-bold text-white mb-3">{step.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="container mx-auto px-4 py-24 relative z-10">
-        <h2 className="text-3xl font-bold text-center mb-12 text-white drop-shadow-sm">
-          Everything You Need
-        </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-          {[
-            { icon: Zap, title: "Smart Analysis", desc: "AI analyzes your request and asks the right clarifying questions." },
-            { icon: CheckCircle2, title: "Quality Scoring", desc: "6-dimension evaluation with actionable improvement tips." },
-            { icon: Trophy, title: "Timed Challenges", desc: "Practice under pressure and climb the leaderboard." },
-            { icon: BookOpen, title: "Guided Learning", desc: "Structured lessons from beginner to advanced techniques." },
-          ].map((f, i) => {
-            const Icon = f.icon;
-            return (
-              <div key={i} className="glass-card rounded-2xl p-6 text-center hover:bg-white/[0.02] transition-colors border border-white/5">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-4 border border-primary/20">
-                  <Icon className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="font-bold text-white mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground">{f.desc}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="container mx-auto px-4 pb-24 relative z-10">
-        <div className="glass-card rounded-3xl p-1 max-w-4xl mx-auto overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-600/30 via-transparent to-amber-600/30 opacity-50" />
-          <div className="relative bg-background/80 backdrop-blur-md rounded-[22px] p-10 md:p-16 text-center border border-white/5">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Ready to build better prompts?</h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-              Start with the Builder for instant results, or dive into the Academy to master the fundamentals of prompt engineering.
+        <div className="mt-12 flex flex-col lg:flex-row items-stretch gap-6 lg:gap-0">
+          <div className="reveal lg:w-[38%] glass-card rounded-2xl p-6 lg:self-center lg:rotate-[-1.2deg]">
+            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-3">
+              before · what most people type
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="h-12 px-8 font-semibold shadow-[0_0_20px_-5px_rgba(235,117,47,0.4)]" asChild>
-                <Link href="/builder">Open Prompt Builder</Link>
-              </Button>
-              <Button size="lg" variant="secondary" className="h-12 px-8 font-semibold bg-white/5 hover:bg-white/10" asChild>
-                <Link href="/academy">Browse Academy</Link>
-              </Button>
+            <pre className="font-mono text-sm text-foreground/70 whitespace-pre-wrap leading-relaxed">
+              {BEFORE_PROMPT}
+            </pre>
+            <div className="mt-4 inline-flex items-center rounded-full border border-destructive/40 bg-destructive/10 px-3 py-1 font-mono text-xs text-destructive">
+              score 31/100
+            </div>
+          </div>
+
+          <div className="reveal flex items-center justify-center px-6 py-2 lg:py-0" aria-hidden="true">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-primary/40 bg-primary/10 shadow-[0_0_30px_-6px_rgba(249,115,22,0.5)]">
+              <ArrowRight className="hidden lg:block h-6 w-6 text-primary" />
+              <ArrowDown className="lg:hidden h-6 w-6 text-primary" />
+            </div>
+          </div>
+
+          <div className="reveal flex-1 glass-card rounded-2xl p-6 border-primary/25 lg:rotate-[0.8deg] shadow-[0_0_60px_-20px_rgba(249,115,22,0.35)]">
+            <p className="font-mono text-[11px] uppercase tracking-widest text-primary mb-3">
+              after · what promptonium builds
+            </p>
+            <pre className="font-mono text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
+              {AFTER_PROMPT}
+            </pre>
+            <div className="mt-4 inline-flex items-center rounded-full border border-primary/50 bg-primary/15 px-3 py-1 font-mono text-xs text-primary">
+              score 92/100
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ---------------- Modes: flowing alternating sections ---------------- */}
+      <section className="relative z-10 px-6 md:px-14 lg:px-20 pb-10">
+        {MODES.map((mode, idx) => {
+          const Icon = mode.icon;
+          const alignRight = idx % 2 === 1;
+          return (
+            <div
+              key={mode.href}
+              className={`reveal relative py-14 md:py-20 flex ${
+                alignRight ? "justify-end" : "justify-start"
+              }`}
+            >
+              <span
+                className={`pointer-events-none absolute top-1/2 -translate-y-1/2 font-display font-extrabold text-[9rem] md:text-[13rem] leading-none text-primary/[0.06] select-none ${
+                  alignRight ? "left-0" : "right-0"
+                }`}
+                aria-hidden="true"
+              >
+                {mode.number}
+              </span>
+
+              <div className={`relative max-w-xl ${alignRight ? "text-right" : ""}`}>
+                <div
+                  className={`inline-flex items-center gap-3 mb-4 ${
+                    alignRight ? "flex-row-reverse" : ""
+                  }`}
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 shadow-[0_0_25px_-6px_rgba(249,115,22,0.45)]">
+                    <Icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="font-mono text-xs uppercase tracking-widest text-primary/80">
+                    {mode.tagline}
+                  </p>
+                </div>
+                <h3 className="font-display text-3xl md:text-5xl font-bold tracking-tight mb-4">
+                  {mode.title}
+                </h3>
+                <p className="text-muted-foreground text-base md:text-lg leading-relaxed mb-6">
+                  {mode.description}
+                </p>
+                <Button
+                  variant="outline"
+                  className="group border-primary/30 hover:border-primary/70 hover:bg-primary/10"
+                  asChild
+                >
+                  <Link href={mode.href}>
+                    {mode.cta}
+                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* ---------------- Journey timeline ---------------- */}
+      <section className="relative z-10 px-6 py-24 md:px-14 lg:px-20 border-t border-primary/10 bg-primary/[0.03]">
+        <div className="reveal max-w-2xl mb-16">
+          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight">
+            One loop. <span className="ember-text">Compounding skill.</span>
+          </h2>
+        </div>
+
+        <div className="relative max-w-2xl mx-auto md:mx-0 md:ml-24">
+          <div
+            className="absolute left-[13px] top-2 bottom-2 w-px bg-gradient-to-b from-primary/70 via-primary/30 to-transparent"
+            aria-hidden="true"
+          />
+          {JOURNEY.map((item, idx) => (
+            <div key={item.step} className="reveal relative pl-14 pb-12 last:pb-0">
+              <div className="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full border border-primary/50 bg-background shadow-[0_0_18px_-4px_rgba(249,115,22,0.6)]">
+                <span className="font-mono text-[10px] font-bold text-primary">{idx + 1}</span>
+              </div>
+              <h3 className="font-display text-xl md:text-2xl font-bold">{item.step}</h3>
+              <p className="text-muted-foreground mt-1">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Personal progress chips */}
+        {stats && (stats.prompts > 0 || stats.lessons > 0 || stats.attempts > 0) && (
+          <div className="reveal mt-16 flex flex-wrap gap-3">
+            <span className="font-mono text-xs text-muted-foreground self-center mr-1">
+              your journey so far:
+            </span>
+            {[
+              { label: "prompts saved", val: stats.prompts },
+              { label: `lessons done / ${totalLessons}`, val: stats.lessons },
+              { label: "arena attempts", val: stats.attempts },
+            ].map((s) => (
+              <span
+                key={s.label}
+                className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/5 px-4 py-1.5 font-mono text-xs"
+              >
+                <span className="text-primary font-bold">{s.val}</span>
+                <span className="text-muted-foreground">{s.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ---------------- Access model + CTA ---------------- */}
+      <section className="relative z-10 px-6 py-24 md:px-14 lg:px-20">
+        <div className="reveal relative max-w-4xl mx-auto rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card/60 to-amber-500/5 p-10 md:p-16 overflow-hidden">
+          <div
+            className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/15 blur-[90px]"
+            aria-hidden="true"
+          />
+          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight mb-4">
+            Start in the next <span className="ember-text">ten seconds.</span>
+          </h2>
+          <p className="text-muted-foreground text-lg mb-10 max-w-2xl">
+            Everything is open — browse challenges ({CHALLENGES.length}), lessons ({totalLessons}),
+            and the Builder with zero sign-up. When you want the AI to work for you, pick one:
+          </p>
+
+          <div className="flex flex-col md:flex-row gap-4 mb-10">
+            {[
+              {
+                icon: UserRound,
+                title: "Create a free account",
+                desc: "Unlocks the free AI engine — no card, no key.",
+              },
+              {
+                icon: KeyRound,
+                title: "Bring your own key",
+                desc: "Paste an Anthropic API key. It never leaves your browser storage.",
+              },
+              {
+                icon: Globe,
+                title: "Just browse",
+                desc: "Lessons, challenges, and your Vault work without either.",
+              },
+            ].map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <div
+                  key={opt.title}
+                  className="flex-1 rounded-2xl border border-primary/15 bg-background/40 p-5"
+                >
+                  <Icon className="h-5 w-5 text-primary mb-3" />
+                  <h3 className="font-semibold mb-1">{opt.title}</h3>
+                  <p className="text-sm text-muted-foreground">{opt.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <Button
+              size="lg"
+              className="h-12 px-8 font-semibold shadow-[0_0_30px_-8px_rgba(249,115,22,0.6)]"
+              asChild
+            >
+              <Link href="/builder">Open the Builder</Link>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-12 px-8 border-primary/30 hover:bg-primary/10"
+              asChild
+            >
+              <Link href="/signup">Create free account</Link>
+            </Button>
+          </div>
+        </div>
+
+        <p className="mt-12 text-center font-mono text-xs text-muted-foreground">
+          promptonium_. — the element of better prompts
+        </p>
       </section>
     </div>
   );

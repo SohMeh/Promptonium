@@ -49,7 +49,7 @@ export function PracticePanel({
   const [hintsRevealed, setHintsRevealed] = useState(0);
   const [showExample, setShowExample] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { useOpenModel } = useModel();
+  const { useOpenModel, aiHeaders } = useModel();
 
   const handleSubmit = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -59,7 +59,7 @@ export function PracticePanel({
     try {
       const res = await fetch("/api/academy/progress", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(useOpenModel ? { "X-Use-Open-Model": "1" } : {}) },
+        headers: { "Content-Type": "application/json", ...aiHeaders() },
         body: JSON.stringify({ pathId, lessonId, promptContent: prompt }),
       });
 
@@ -74,7 +74,7 @@ export function PracticePanel({
     } finally {
       setIsLoading(false);
     }
-  }, [prompt, pathId, lessonId, onComplete, useOpenModel]);
+  }, [prompt, pathId, lessonId, onComplete, useOpenModel, aiHeaders]);
 
   const handleRevealHint = () => {
     if (hintsRevealed < practice.hints.length) {

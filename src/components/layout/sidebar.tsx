@@ -3,18 +3,19 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useModel } from "@/context/model-context";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { AiEnginePanel } from "@/components/layout/ai-engine-panel";
 import {
   Wand2,
   Swords,
   GraduationCap,
   Library,
   Linkedin,
-  Zap,
-  Globe,
+  Settings2,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -27,12 +28,12 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
 
   const userName = session?.user?.name ?? null;
-  const { useOpenModel, toggleModel } = useModel();
 
   function handleLogout() {
-    signOut({ callbackUrl: "/login" });
+    signOut({ callbackUrl: "/" });
   }
 
   return (
@@ -92,42 +93,9 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* AI Engine toggle */}
+        {/* AI Engine toggle + bring-your-own-key */}
         <div className="px-4 pb-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-1">
-            AI Engine
-          </p>
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            <button
-              type="button"
-              onClick={() => useOpenModel && toggleModel()}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
-                !useOpenModel
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              <Zap className="h-3 w-3" />
-              API Key (currently down)
-            </button>
-            <button
-              type="button"
-              onClick={() => !useOpenModel && toggleModel()}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
-                useOpenModel
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              <Globe className="h-3 w-3" />
-              Free
-            </button>
-          </div>
-          {useOpenModel && (
-            <p className="text-[10px] text-muted-foreground mt-1.5 px-1">
-              Free model may take 10–30s
-            </p>
-          )}
+          <AiEnginePanel />
         </div>
 
         <div className="p-4 border-t border-border/50">
@@ -184,6 +152,57 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Settings: AI engine + account */}
+          <Sheet open={mobileSettingsOpen} onOpenChange={setMobileSettingsOpen}>
+            <SheetTrigger asChild>
+              <button type="button" className="flex-1">
+                <div className="flex flex-col items-center justify-center h-full gap-1 p-1 text-muted-foreground hover:text-foreground transition-all">
+                  <div className="p-1.5 rounded-xl">
+                    <Settings2 className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] font-medium">Settings</span>
+                </div>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="pb-8">
+              <SheetHeader>
+                <SheetTitle>Settings</SheetTitle>
+              </SheetHeader>
+              <div className="px-4 space-y-6">
+                <AiEnginePanel />
+                <div className="border-t border-border/50 pt-4">
+                  {userName ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30">
+                        <div className="h-8 w-8 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary">
+                            {userName.slice(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{userName}</span>
+                          <span className="text-xs text-muted-foreground">Logged in</span>
+                        </div>
+                      </div>
+                      <Button variant="outline" className="w-full" onClick={handleLogout}>
+                        Log out
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Button className="w-full" asChild>
+                        <Link href="/signup" onClick={() => setMobileSettingsOpen(false)}>Sign up</Link>
+                      </Button>
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link href="/login" onClick={() => setMobileSettingsOpen(false)}>Log in</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </nav>
     </>

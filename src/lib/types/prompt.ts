@@ -27,6 +27,8 @@ export interface PromptProject {
   tags: string[];
   modelTarget: ModelTarget;
   sourceMode: "builder" | "arena";
+  /** Original intake, kept so the project can be re-opened in the Builder. */
+  intake?: BuilderIntake;
 }
 
 export interface PromptVersion {

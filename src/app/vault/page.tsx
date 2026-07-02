@@ -22,6 +22,7 @@ export default function VaultPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage hydration must run post-mount
     loadProjects();
   }, [loadProjects]);
 

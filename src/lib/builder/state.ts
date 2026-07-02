@@ -14,6 +14,8 @@ export interface BuilderState {
   isLoading: boolean;
   error: string | null;
   streamingContent: string;
+  /** Vault project being edited; saves append a new version to it. */
+  projectId: string | null;
 }
 
 export const INITIAL_STATE: BuilderState = {
@@ -27,4 +29,5 @@ export const INITIAL_STATE: BuilderState = {
   isLoading: false,
   error: null,
   streamingContent: "",
+  projectId: null,
 };

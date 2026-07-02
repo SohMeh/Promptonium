@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 
 export async function POST(request: Request) {
+  const limited = rateLimit(request, "verify-email", 10, 600000);
+  if (limited) return limited;
+
   try {
     const session = await auth();
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn, getSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,12 @@ type AuthFormProps = {
   mode: Mode;
 };
 
+const OAUTH_PROVIDERS = [
+  { id: "google", label: "Google" },
+  { id: "github", label: "GitHub" },
+  { id: "facebook", label: "Facebook" },
+] as const;
+
 export function AuthForm({ mode }: AuthFormProps) {
   const searchParams = useSearchParams();
 
@@ -24,6 +30,21 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableOAuth, setAvailableOAuth] = useState<string[]>([]);
+
+  // Only offer the OAuth providers that are actually configured server-side.
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((providers: Record<string, { type?: string }>) => {
+        setAvailableOAuth(
+          Object.keys(providers ?? {}).filter(
+            (id) => providers[id]?.type === "oauth" || providers[id]?.type === "oidc"
+          )
+        );
+      })
+      .catch(() => setAvailableOAuth([]));
+  }, []);
 
   const isSignup = mode === "signup";
 
@@ -57,13 +78,14 @@ export function AuthForm({ mode }: AuthFormProps) {
           return;
         }
 
-        // Auto-login after signup, then redirect to verify page
+        // Auto-login after signup; only detour to the verify page when a
+        // verification email was actually sent.
         const result = await signIn("credentials", { email, password, redirect: false });
         if (result?.error) {
           setError("Account created but login failed. Please log in manually.");
           return;
         }
-        window.location.href = "/verify-email";
+        window.location.href = signupData.verified ? redirectPath : "/verify-email";
         return;
       }
 
@@ -187,31 +209,32 @@ export function AuthForm({ mode }: AuthFormProps) {
               </div>
             ) : null}
 
-            <div className="relative py-1">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-              </div>
-            </div>
+            {availableOAuth.length > 0 && (
+              <>
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                  </div>
+                </div>
 
-            <p className="text-center text-sm font-medium text-red-500">
-              OAuth sign-in is currently unavailable. Please use email and password.
-            </p>
-
-            <div className="grid gap-2 pointer-events-none opacity-50">
-              <Button type="button" variant="outline" onClick={() => handleOAuth("google")}>
-                Google
-              </Button>
-              <Button type="button" variant="outline" onClick={() => handleOAuth("github")}>
-                <Github className="mr-2 h-4 w-4" />
-                GitHub
-              </Button>
-              <Button type="button" variant="outline" onClick={() => handleOAuth("facebook")}>
-                Facebook
-              </Button>
-            </div>
+                <div className="grid gap-2">
+                  {OAUTH_PROVIDERS.filter((p) => availableOAuth.includes(p.id)).map((p) => (
+                    <Button
+                      key={p.id}
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleOAuth(p.id)}
+                    >
+                      {p.id === "github" && <Github className="mr-2 h-4 w-4" />}
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
           </form>
 
           <p className="mt-4 text-sm text-muted-foreground">

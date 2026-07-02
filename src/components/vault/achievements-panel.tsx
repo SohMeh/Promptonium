@@ -20,6 +20,7 @@ export function AchievementsPanel() {
 
   useEffect(() => {
     const checked = checkAchievements();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage hydration must run post-mount
     setAchievements(checked);
 
     // Persist updated achievements to profile

@@ -14,7 +14,7 @@ export default function VerifyEmailPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,10 +49,10 @@ export default function VerifyEmailPage() {
   async function handleResend() {
     setResendStatus("sending");
     try {
-      await fetch("/api/auth/resend-verification", { method: "POST" });
-      setResendStatus("sent");
+      const res = await fetch("/api/auth/resend-verification", { method: "POST" });
+      setResendStatus(res.ok ? "sent" : "failed");
     } catch {
-      setResendStatus("idle");
+      setResendStatus("failed");
     }
   }
 
@@ -95,10 +95,16 @@ export default function VerifyEmailPage() {
                 <button
                   type="button"
                   onClick={handleResend}
-                  disabled={resendStatus !== "idle"}
+                  disabled={resendStatus === "sending" || resendStatus === "sent"}
                   className="text-sm text-primary hover:underline disabled:opacity-50 disabled:no-underline"
                 >
-                  {resendStatus === "sending" ? "Sending…" : resendStatus === "sent" ? "Code sent!" : "Resend code"}
+                  {resendStatus === "sending"
+                    ? "Sending…"
+                    : resendStatus === "sent"
+                      ? "Code sent!"
+                      : resendStatus === "failed"
+                        ? "Sending failed — tap to retry"
+                        : "Resend code"}
                 </button>
               </div>
             </form>

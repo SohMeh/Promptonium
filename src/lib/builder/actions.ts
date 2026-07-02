@@ -1,5 +1,5 @@
 import type { BuilderState, BuilderStep } from "./state";
-import type { BuilderIntake, ClarifyingQuestion, PromptContent } from "@/lib/types/prompt";
+import type { BuilderIntake, ClarifyingQuestion, PromptContent, PromptProject } from "@/lib/types/prompt";
 import type { EvaluationRun } from "@/lib/types/evaluation";
 
 export type BuilderAction =
@@ -13,7 +13,21 @@ export type BuilderAction =
   | { type: "PROMPT_GENERATED"; prompt: PromptContent }
   | { type: "EVALUATION_COMPLETE"; evaluation: EvaluationRun }
   | { type: "UPDATE_PROMPT_SECTION"; section: keyof PromptContent; value: string }
+  | { type: "LOAD_PROJECT"; project: PromptProject }
+  | { type: "PROJECT_SAVED"; projectId: string }
   | { type: "RESET" };
+
+/** Rebuild an intake for projects saved before intake was stored. */
+function fallbackIntake(project: PromptProject): BuilderIntake {
+  return {
+    objective: project.title,
+    taskType: (project.tags[0] as BuilderIntake["taskType"]) ?? "other",
+    audience: "general",
+    tone: "professional",
+    constraints: "",
+    modelTarget: project.modelTarget,
+  };
+}
 
 export function builderReducer(state: BuilderState, action: BuilderAction): BuilderState {
   switch (action.type) {
@@ -68,6 +82,26 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         generatedPrompt: { ...state.generatedPrompt, [action.section]: action.value },
         evaluation: null,
       };
+    case "LOAD_PROJECT": {
+      const latest = action.project.versions[action.project.versions.length - 1];
+      if (!latest) return state;
+      return {
+        ...state,
+        currentStep: "improve",
+        intake: action.project.intake ?? fallbackIntake(action.project),
+        refinedIntent: null,
+        clarifyingQuestions: [],
+        answers: {},
+        generatedPrompt: latest.content,
+        evaluation: latest.evaluation,
+        isLoading: false,
+        error: null,
+        streamingContent: "",
+        projectId: action.project.id,
+      };
+    }
+    case "PROJECT_SAVED":
+      return { ...state, projectId: action.projectId };
     case "RESET":
       return {
         ...state,
@@ -81,6 +115,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         isLoading: false,
         error: null,
         streamingContent: "",
+        projectId: null,
       };
     default:
       return state;
