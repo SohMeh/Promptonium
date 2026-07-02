@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getChallengeById } from "@/data/challenges";
 import { evaluatePrompt } from "@/lib/services/evaluation-engine";
-import { getProviderRegistry } from "@/lib/providers";
+import { resolveProviderFromRequest } from "@/lib/providers";
 import { parsePromptSections } from "@/lib/builder/prompt-templates";
 import type { PromptContent, BuilderIntake, TaskType, ToneType } from "@/lib/types/prompt";
 import type { RubricConfig } from "@/lib/types/evaluation";
@@ -70,11 +70,7 @@ export async function POST(request: Request) {
       : undefined;
 
     // Run evaluation
-    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
-    const registry = getProviderRegistry();
-    const provider = useOpenModel
-      ? registry.get("free") ?? registry.getDefault()
-      : registry.getDefault();
+    const provider = resolveProviderFromRequest(request);
 
     const evaluation = await evaluatePrompt(parsedContent, intake, rubricConfig, provider);
 

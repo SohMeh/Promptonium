@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLessonById } from "@/data/academy/paths";
 import { evaluatePrompt } from "@/lib/services/evaluation-engine";
-import { getProviderRegistry } from "@/lib/providers";
+import { resolveProviderFromRequest } from "@/lib/providers";
 import { parsePromptSections } from "@/lib/builder/prompt-templates";
 import type { BuilderIntake } from "@/lib/types/prompt";
 
@@ -42,11 +42,7 @@ export async function POST(request: Request) {
     };
 
     // Evaluate
-    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
-    const registry = getProviderRegistry();
-    const provider = useOpenModel
-      ? registry.get("free") ?? registry.getDefault()
-      : registry.getDefault();
+    const provider = resolveProviderFromRequest(request);
 
     const evaluation = await evaluatePrompt(parsedContent, intake, undefined, provider);
 

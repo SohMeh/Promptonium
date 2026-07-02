@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProviderRegistry } from "@/lib/providers";
+import { resolveProviderFromRequest } from "@/lib/providers";
 import { buildClarifyPrompt } from "@/lib/builder/prompt-templates";
 import type { BuilderIntake } from "@/lib/types/prompt";
 
@@ -11,11 +11,7 @@ export async function POST(request: Request) {
       refinedIntent: Record<string, unknown>;
     };
 
-    const registry = getProviderRegistry();
-    const useOpenModel = request.headers.get("X-Use-Open-Model") === "1";
-    const provider = useOpenModel
-      ? registry.get("free") ?? registry.getDefault()
-      : registry.getDefault();
+    const provider = resolveProviderFromRequest(request);
     const { system, user } = buildClarifyPrompt(intake, refinedIntent, answers);
 
     const result = await provider.generate(user, {
